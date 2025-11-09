@@ -6,6 +6,7 @@ import { buildApp } from '../app';
 import { env } from '../config/env';
 import { createTwilioSignature } from '../lib/twilio';
 import { createMockPrisma } from '../test-utils/mockPrisma';
+import { createStripeSignature } from '../test-utils/stripe';
 import Stripe from 'stripe';
 import * as stripeLib from '../lib/stripe';
 
@@ -456,21 +457,84 @@ describe('amunet platform flows', () => {
     env.STRIPE_WEBHOOK_SECRET = 'whsec-test';
 
     const rawBody = JSON.stringify({ payload: true });
+    const signature = createStripeSignature(rawBody);
     const response = await app.inject({
       method: 'POST',
       url: '/api/billing/webhook',
       payload: rawBody,
       headers: {
-        'stripe-signature': 'sig',
+        'stripe-signature': signature,
         'content-type': 'application/json'
       }
     });
 
     expect(response.statusCode).toBe(200);
-    expect(stripeMock.webhooks.constructEvent).toHaveBeenCalledWith(rawBody, 'sig', 'whsec-test');
+    expect(stripeMock.webhooks.constructEvent).toHaveBeenCalledWith(rawBody, signature, 'whsec-test');
 
     const updated = await client.subscription.findUnique({ where: { id: subscription.id } });
     expect(updated?.status).toBe('PAST_DUE');
     expect(updated?.stripeSubId).toBe('sub_webhook');
+  });
+
+  it('treats duplicate webhook deliveries as idempotent', async () => {
+    const { client } = context.prisma;
+    await client.subscription.create({
+      data: {
+        tenantId: 'tenant_webhook',
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        meteredMinutes: 0,
+        stripeCustomer: 'cus_webhook'
+      }
+    } as any);
+
+    const stripeEvent = {
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          customer: 'cus_webhook',
+          status: 'active',
+          id: 'sub_webhook'
+        }
+      }
+    } as Stripe.Event;
+
+    const stripeMock = {
+      webhooks: {
+        constructEvent: vi.fn().mockReturnValue(stripeEvent)
+      }
+    } as unknown as Stripe;
+
+    stripeLib.setStripeClientForTesting(stripeMock);
+    env.STRIPE_WEBHOOK_SECRET = 'whsec-test';
+
+    const rawBody = JSON.stringify({ payload: true });
+    const signature = createStripeSignature(rawBody);
+
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      payload: rawBody,
+      headers: {
+        'stripe-signature': signature,
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      payload: rawBody,
+      headers: {
+        'stripe-signature': signature,
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(second.statusCode).toBe(200);
+    expect(second.json()?.duplicate).toBe(true);
+    expect(stripeMock.webhooks.constructEvent).toHaveBeenCalledTimes(2);
   });
 });

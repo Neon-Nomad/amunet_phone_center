@@ -22,8 +22,13 @@ function matchesWhere(record: Record<string, any>, where?: WhereInput): boolean 
   if (!where) return true;
   return Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
-    if (value && typeof value === 'object' && !Array.isArray(value) && 'equals' in value) {
-      return record[key] === value.equals;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if ('equals' in value) {
+        return record[key] === value.equals;
+      }
+      if ('contains' in value) {
+        return (record[key] ?? '').includes(value.contains);
+      }
     }
     return record[key] === value;
   });
@@ -125,6 +130,7 @@ export function createMockPrisma() {
     },
     subscription: {
       create: makeCreate('subscription'),
+      findMany: makeFindMany('subscription'),
       findFirst: makeFindFirst('subscription'),
       findUnique: makeFindUnique('subscription'),
       update: makeUpdate('subscription'),
@@ -150,7 +156,8 @@ export function createMockPrisma() {
     },
     auditLog: {
       create: makeCreate('auditLog'),
-      findMany: makeFindMany('auditLog')
+      findMany: makeFindMany('auditLog'),
+      findFirst: makeFindFirst('auditLog')
     },
     $transaction: async (callback: (tx: PrismaClient) => Promise<any>) => {
       return callback(client as PrismaClient);

@@ -129,6 +129,19 @@ All tenant-specific endpoints require the `x-tenant-id` header.
 - Set `STRIPE_WEBHOOK_SECRET` to the Signing Secret provided in the Stripe dashboard. Stripe CLI (`stripe listen --forward-to`) is helpful for asserting the endpoint and signature.
 - The handler updates the Prisma `Subscription` status and `stripeSubId` so the dashboard reflects Stripe’s source of truth and you can reconcile failed renewal states.
 - Monitor webhook health through Stripe’s Webhook dashboard (Notifications → Webhooks) and add alerts around failed deliveries so retries receive human follow-up; logging unsuccessful verifications (e.g., invalid signatures) into your observability stack helps with long-term tracking.
+- Idempotent delivery is enforced via audit-log entries keyed by Stripe event IDs, so duplicate retries simply return `{ received: true, duplicate: true }`. Failures are logged with the event ID/type and return HTTP 500 so Stripe retries.
+
+### Webhook Monitoring
+
+- **Failed webhooks:** Track 4xx/5xx responses in Stripe’s Dashboard and correlate with telemetry (e.g., `billing_webhook` audit logs).
+- **Processing time:** Keep each handler under 5 seconds; long-running handlers are surfaced via `pino` spans or Fastify metrics.
+- **Duplicate events:** Normal; our audit log deduplication will flag duplicates as `duplicate: true`, but track them to ensure idempotency keeps working.
+- **Missing events:** Alert on webhook endpoint downtime or high latency so you can request Stripe to retry missed deliveries.
+
+Suggested alerts:
+1. 3+ consecutive webhook failures (Stripe shows this and it should map to an ops alert).
+2. Webhook endpoint unreachable (Fastify/hosting-level health check).
+3. Unhandled event types logged as warnings so you can add new handlers before sellers start subscribing to them.
 
 ## Frontend Overview
 
