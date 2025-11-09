@@ -251,6 +251,50 @@ describe('amunet platform flows', () => {
     expect(store.message.find((msg) => msg.direction === 'system')).toBeTruthy();
   });
 
+  it('handles busy call status updates', async () => {
+    const { client, store } = context.prisma;
+    await client.tenant.create({ data: { id: 'tenant_busy', name: 'Busy Inc' } } as any);
+    await client.subscription.create({
+      data: { tenantId: 'tenant_busy', tier: 'STARTER', status: 'ACTIVE', meteredMinutes: 0 }
+    } as any);
+    await client.call.create({
+      data: {
+        tenantId: 'tenant_busy',
+        providerSid: 'CA_busy',
+        fromNumber: '+1111',
+        toNumber: '+2222',
+        status: 'queued'
+      }
+    } as any);
+
+    const payload = {
+      CallSid: 'CA_busy',
+      CallStatus: 'busy',
+      From: '+1111',
+      To: '+2222'
+    };
+    const signature = createTwilioSignature(
+      `https://${context.host}/api/twilio/status`,
+      payload
+    );
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/twilio/status',
+      headers: {
+        'x-tenant-id': 'tenant_busy',
+        host: context.host,
+        'x-forwarded-proto': 'https',
+        'x-twilio-signature': signature
+      },
+      payload
+    });
+
+    expect(
+      store.auditLog.some((log) => log.message.includes('Missed call') && log.message.includes('busy'))
+    ).toBe(true);
+  });
+
   it('enforces premium voice upgrades via config route', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'Voice Co' } } as any);
@@ -838,5 +882,179 @@ describe('amunet platform flows', () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json().error).toContain('not linked');
+  });
+
+  it('returns empty dashboard arrays when tenant has no activity', async () => {
+    const { client } = context.prisma;
+    const tenant = await client.tenant.create({ data: { name: 'Empty Tenant' } } as any);
+    await client.subscription.create({
+      data: { tenantId: tenant.id, tier: 'STARTER', status: 'ACTIVE' }
+    } as any);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/overview',
+      headers: { 'x-tenant-id': tenant.id }
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.calls).toEqual([]);
+    expect(body.bookings).toEqual([]);
+    expect(body.subscription).toBeTruthy();
+  });
+
+  it('preserves unknown Twilio webhook fields via passthrough', async () => {
+    const onboardingResponse = await app.inject({
+      method: 'POST',
+      url: '/api/onboarding/start',
+      payload: {
+        businessName: 'Passthrough Test',
+        email: 'pass@test.com',
+        tier: 'STARTER'
+      }
+    });
+    const tenantId = onboardingResponse.json().tenantId;
+
+    const payload = {
+      CallSid: 'CA_pass',
+      From: '+1234',
+      To: '+5678',
+      CallStatus: 'queued',
+      CustomField1: 'custom_value',
+      FutureFeature: { nested: 'data' }
+    };
+    const signature = createTwilioSignature(`https://${context.host}/api/twilio/voice`, payload);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/twilio/voice',
+      headers: {
+        'x-tenant-id': tenantId,
+        host: context.host,
+        'x-forwarded-proto': 'https',
+        'x-twilio-signature': signature
+      },
+      payload
+    });
+
+    const call = context.prisma.store.call.find((record) => record.providerSid === 'CA_pass');
+    expect(call?.metadata).toHaveProperty('CustomField1', 'custom_value');
+    expect(call?.metadata).toHaveProperty('FutureFeature');
+  });
+
+  it('allows professional tier to set premium voices', async () => {
+    const { client } = context.prisma;
+    const tenant = await client.tenant.create({ data: { name: 'Premium Co' } } as any);
+    await client.subscription.create({
+      data: { tenantId: tenant.id, tier: 'PROFESSIONAL', status: 'ACTIVE', meteredMinutes: 0 }
+    } as any);
+    await client.businessConfig.create({
+      data: {
+        tenantId: tenant.id,
+        businessName: 'Premium Co',
+        voiceProfile: 'confident-nova',
+        aiProvider: 'openai-standard',
+        callRoutingConfig: {}
+      }
+    } as any);
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/config',
+      headers: { 'x-tenant-id': tenant.id },
+      payload: {
+        voiceProfile: 'confident-elevenlabs-premium',
+        aiProvider: 'openai-premium',
+        calendarLink: null
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().updated).toBe(1);
+  });
+
+  it('prevents duplicate registration', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: {
+        email: 'duplicate@test.com',
+        password: 'password123',
+        tenantName: 'First Tenant'
+      }
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: {
+        email: 'duplicate@test.com',
+        password: 'differentpass',
+        tenantName: 'Second Tenant'
+      }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error).toContain('already exists');
+  });
+
+  it('rejects login with wrong password and non-existent users', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: {
+        email: 'user@test.com',
+        password: 'correctpass',
+        tenantName: 'Test Tenant'
+      }
+    });
+
+    const wrongPassword = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        email: 'user@test.com',
+        password: 'wrongpass'
+      }
+    });
+
+    expect(wrongPassword.statusCode).toBe(401);
+    expect(wrongPassword.json().error).toContain('Invalid credentials');
+
+    const missingUser = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        email: 'nonexistent@test.com',
+        password: 'nonexistentpass'
+      }
+    });
+
+    expect(missingUser.statusCode).toBe(401);
+  });
+
+  it('returns pending booking when Cal.com is not configured', async () => {
+    env.CALCOM_API_KEY = undefined;
+    const { client } = context.prisma;
+    const tenant = await client.tenant.create({ data: { name: 'No Cal' } } as any);
+    await client.subscription.create({
+      data: { tenantId: tenant.id, tier: 'STARTER', status: 'ACTIVE', meteredMinutes: 0 }
+    } as any);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/scheduling/book',
+      headers: { 'x-tenant-id': tenant.id },
+      payload: {
+        eventType: 'demo',
+        customerName: 'Test User',
+        customerEmail: 'test@example.com',
+        startsAt: new Date().toISOString()
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().status).toBe('pending-activation');
   });
 });
