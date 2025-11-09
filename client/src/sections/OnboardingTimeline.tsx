@@ -1,0 +1,34 @@
+const steps = [
+  { title: 'Signal Intake', description: 'Enter business name or URL to auto-detect your footprint.' },
+  { title: 'Profile Detection', description: 'We enrich industry, services, hours, and compliance signals.' },
+  { title: 'Voice & Tone', description: 'Choose a voice template that mirrors your brand and tier.' },
+  { title: 'Config Generation', description: 'Amunet builds call flows, chat widgets, and knowledge base stubs.' },
+  { title: 'Integration Sync', description: 'Connect Twilio, Cal.com, Stripe, and optional CRMs instantly.' },
+  { title: 'Launch & Monitor', description: 'Deploy numbers, widget snippets, and dashboards with real-time logs.' }
+];
+
+export default function OnboardingTimeline() {
+  return (
+    <section id="how-it-works" className="bg-dark py-24 text-white">
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="max-w-2xl space-y-4">
+          <h2 className="font-display text-3xl font-semibold md:text-4xl">Six steps from sign-up to your live AI receptionist</h2>
+          <p className="text-white/70">
+            The onboarding assistant handles everything with guardrails for compliance and premium voice eligibility.
+          </p>
+        </div>
+        <ol className="mt-12 grid gap-10 md:grid-cols-3">
+          {steps.map((step, index) => (
+            <li key={step.title} className="relative rounded-2xl border border-white/10 bg-white/5 p-6">
+              <div className="absolute -top-4 left-6 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-semibold">
+                {index + 1}
+              </div>
+              <h3 className="mt-6 font-display text-lg text-white">{step.title}</h3>
+              <p className="mt-3 text-sm text-white/70">{step.description}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
