@@ -29,6 +29,9 @@ describe('amunet platform flows', () => {
     context.prisma = createMockPrisma();
     env.TWILIO_AUTH_TOKEN = 'twilio-secret';
     env.OPENAI_API_KEY = 'test-openai';
+    env.STRIPE_STARTER_PRICE_ID = 'price_starter';
+    env.STRIPE_PROFESSIONAL_PRICE_ID = 'price_professional';
+    env.STRIPE_ENTERPRISE_PRICE_ID = 'price_enterprise';
     env.CALCOM_API_KEY = undefined;
     axiosPost.mockReset();
     axiosPost.mockImplementation(async (url: string) => {
@@ -536,5 +539,304 @@ describe('amunet platform flows', () => {
     expect(second.statusCode).toBe(200);
     expect(second.json()?.duplicate).toBe(true);
     expect(stripeMock.webhooks.constructEvent).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects Stripe webhooks with invalid signatures', async () => {
+    env.STRIPE_WEBHOOK_SECRET = 'whsec-test';
+
+    const stripeMock = {
+      webhooks: {
+        constructEvent: vi.fn().mockImplementation(() => {
+          throw new Error('invalid signature');
+        })
+      }
+    } as unknown as Stripe;
+    stripeLib.setStripeClientForTesting(stripeMock);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      payload: JSON.stringify({ type: 'customer.subscription.updated' }),
+      headers: {
+        'content-type': 'application/json',
+        'stripe-signature': 't=0,v1=bad'
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toContain('Invalid Stripe signature');
+  });
+
+  it('returns 400 when Stripe webhook is not configured', async () => {
+    env.STRIPE_WEBHOOK_SECRET = undefined;
+    stripeLib.setStripeClientForTesting(null);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      payload: '{}',
+      headers: {
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toContain('not configured');
+  });
+
+  it('handles customer.subscription.deleted events', async () => {
+    const { client } = context.prisma;
+    await client.subscription.create({
+      data: {
+        tenantId: 'tenant_delete',
+        tier: 'PROFESSIONAL',
+        status: 'ACTIVE',
+        stripeCustomer: 'cus_delete',
+        stripeSubId: 'sub_delete'
+      }
+    } as any);
+
+    const stripeEvent = {
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_delete',
+          customer: 'cus_delete',
+          status: 'canceled'
+        }
+      }
+    } as Stripe.Event;
+
+    const stripeMock = {
+      webhooks: {
+        constructEvent: vi.fn().mockReturnValue(stripeEvent)
+      }
+    } as unknown as Stripe;
+
+    stripeLib.setStripeClientForTesting(stripeMock);
+    env.STRIPE_WEBHOOK_SECRET = 'whsec-test';
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      payload: JSON.stringify(stripeEvent),
+      headers: {
+        'stripe-signature': createStripeSignature(stripeEvent),
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const updated = await client.subscription.findFirst({
+      where: { stripeCustomer: 'cus_delete' }
+    });
+    expect(updated?.status).toBe('CANCELED');
+  });
+
+  it('returns 500 on webhook processing failure for retry support', async () => {
+    const { client } = context.prisma;
+    const subscription = await client.subscription.create({
+      data: {
+        tenantId: 'fail_tenant',
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        stripeCustomer: 'cus_fail',
+        stripeSubId: 'sub_fail'
+      }
+    } as any);
+
+    const stripeEvent = {
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_fail',
+          customer: 'cus_fail',
+          status: 'active'
+        }
+      }
+    } as Stripe.Event;
+
+    const stripeMock = {
+      webhooks: {
+        constructEvent: vi.fn().mockReturnValue(stripeEvent)
+      }
+    } as unknown as Stripe;
+
+    stripeLib.setStripeClientForTesting(stripeMock);
+    env.STRIPE_WEBHOOK_SECRET = 'whsec-test';
+
+    const originalUpdateMany = context.prisma.client.subscription.updateMany;
+    context.prisma.client.subscription.updateMany = vi.fn().mockRejectedValue(new Error('DB error'));
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      payload: JSON.stringify(stripeEvent),
+      headers: {
+        'stripe-signature': createStripeSignature(stripeEvent),
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json().error).toContain('Processing failed');
+
+    context.prisma.client.subscription.updateMany = originalUpdateMany;
+  });
+
+  it('returns 400 when tenant ID is missing', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/overview'
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: 'Bad Request',
+      message: expect.stringContaining('tenant identifier')
+    });
+  });
+
+  it('creates new Stripe customer on first checkout', async () => {
+    const { client } = context.prisma;
+    const tenant = await client.tenant.create({ data: { name: 'New Co' } } as any);
+    await client.subscription.create({
+      data: {
+        tenantId: tenant.id,
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        stripeCustomer: null
+      }
+    } as any);
+
+    const stripeMock = {
+      customers: {
+        create: vi.fn().mockResolvedValue({ id: 'cus_new' })
+      },
+      checkout: {
+        sessions: {
+          create: vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com' })
+        }
+      }
+    } as unknown as Stripe;
+
+    stripeLib.setStripeClientForTesting(stripeMock as unknown as Stripe);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/checkout',
+      headers: { 'x-tenant-id': tenant.id },
+      payload: {
+        tier: 'PROFESSIONAL',
+        customerEmail: 'new@example.com',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel'
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(stripeMock.customers?.create).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      metadata: { tenantId: tenant.id }
+    });
+
+    const updated = await client.subscription.findFirst({
+      where: { tenantId: tenant.id }
+    });
+    expect(updated?.stripeCustomer).toBe('cus_new');
+  });
+
+  it('reuses existing Stripe customer on subsequent checkout', async () => {
+    const { client } = context.prisma;
+    const tenant = await client.tenant.create({ data: { name: 'Existing Co' } } as any);
+    await client.subscription.create({
+      data: {
+        tenantId: tenant.id,
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        stripeCustomer: 'cus_existing'
+      }
+    } as any);
+
+    const stripeMock = {
+      customers: {
+        create: vi.fn()
+      },
+      checkout: {
+        sessions: {
+          create: vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com' })
+        }
+      }
+    } as unknown as Stripe;
+
+    stripeLib.setStripeClientForTesting(stripeMock);
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/billing/checkout',
+      headers: { 'x-tenant-id': tenant.id },
+      payload: {
+        tier: 'PROFESSIONAL',
+        customerEmail: 'existing@example.com',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel'
+      }
+    });
+
+    expect(stripeMock.customers?.create).not.toHaveBeenCalled();
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: 'cus_existing'
+      })
+    );
+  });
+
+  it('rejects checkout with invalid email', async () => {
+    const { client } = context.prisma;
+    const tenant = await client.tenant.create({ data: { name: 'Test' } } as any);
+    await client.subscription.create({
+      data: { tenantId: tenant.id, tier: 'STARTER', status: 'ACTIVE' }
+    } as any);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/checkout',
+      headers: { 'x-tenant-id': tenant.id },
+      payload: {
+        tier: 'PROFESSIONAL',
+        customerEmail: 'not-an-email',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel'
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('returns 403 when subscription has no Stripe customer', async () => {
+    const { client } = context.prisma;
+    const tenant = await client.tenant.create({ data: { name: 'No Customer' } } as any);
+    await client.subscription.create({
+      data: {
+        tenantId: tenant.id,
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        stripeCustomer: null
+      }
+    } as any);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/portal',
+      headers: { 'x-tenant-id': tenant.id },
+      payload: {
+        customerId: 'cus_any',
+        returnUrl: 'https://example.com'
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error).toContain('not linked');
   });
 });

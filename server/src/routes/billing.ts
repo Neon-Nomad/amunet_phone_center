@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import Stripe from 'stripe';
 
 import { assertTenant } from '../lib/tenant';
@@ -20,7 +20,18 @@ export default async function billingRoutes(app: FastifyInstance) {
 
   app.post('/checkout', async (request, reply) => {
     const tenant = assertTenant(request, reply);
-    const body = checkoutSchema.parse(request.body);
+    let body;
+    try {
+      body = checkoutSchema.parse(request.body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return reply.status(400).send({
+          error: 'Invalid checkout payload',
+          details: error.flatten().fieldErrors
+        });
+      }
+      throw error;
+    }
 
     const session = await billingService.createCheckoutSession({
       tier: body.tier,
@@ -146,6 +157,7 @@ async function handleStripeEvent(app: FastifyInstance, event: Stripe.Event): Pro
   switch (event.type) {
     case 'customer.subscription.updated':
     case 'customer.subscription.created':
+    case 'customer.subscription.deleted':
       return handleSubscriptionEvent(app, event.data.object as Stripe.Subscription);
     default:
       app.log.warn({ eventType: event.type }, 'Unhandled Stripe event type');
