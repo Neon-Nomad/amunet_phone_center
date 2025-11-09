@@ -15,9 +15,14 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   CALCOM_API_KEY: z.string().optional(),
   CALCOM_BASE_URL: z.string().optional().default('https://api.cal.com/v2'),
+  CALCOM_BOOKING_URL: z.string().optional(),
   STRIPE_STARTER_PRICE_ID: z.string().optional(),
   STRIPE_PROFESSIONAL_PRICE_ID: z.string().optional(),
-  STRIPE_ENTERPRISE_PRICE_ID: z.string().optional()
+  STRIPE_ENTERPRISE_PRICE_ID: z.string().optional(),
+  SENDGRID_API_KEY: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  SLACK_WEBHOOK_URL: z.string().optional(),
+  TWILIO_SUPPORT_NUMBER: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);

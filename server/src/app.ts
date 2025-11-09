@@ -16,6 +16,7 @@ import billingRoutes from './routes/billing';
 import schedulingRoutes from './routes/scheduling';
 import dashboardRoutes from './routes/dashboard';
 import configRoutes from './routes/config';
+import chatbotRoutes from './routes/chatbot';
 
 export interface BuildAppOptions {
   prismaClient?: PrismaClient;
@@ -58,6 +59,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(schedulingRoutes, { prefix: '/api/scheduling' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
   await app.register(configRoutes, { prefix: '/api/config' });
+  await app.register(chatbotRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof TenantMissingError) {
