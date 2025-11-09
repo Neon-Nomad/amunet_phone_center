@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function Footer() {
   return (
     <footer className="bg-dark py-12 text-white/60">
@@ -10,9 +12,9 @@ export default function Footer() {
           <a href="#" className="hover:text-white">
             Terms
           </a>
-          <a href="mailto:hello@amunet.ai" className="hover:text-white">
+          <Link to="/contact" className="hover:text-white">
             Contact
-          </a>
+          </Link>
         </nav>
         <p className="text-xs text-white/40">© {new Date().getFullYear()} Neon Nomad Systems. All rights reserved.</p>
       </div>

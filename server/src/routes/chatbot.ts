@@ -1,14 +1,24 @@
 import { FastifyPluginAsync } from 'fastify';
 import axios from 'axios';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 import { env } from '../config/env';
-import pricingData from '../config/pricing.json';
+import { sendSalesEmail } from '../services/mailService';
 
-interface ChatRequestBody {
+interface PricingTier {
+  name: string;
+  price: string;
+  description: string;
+  features: string[];
+}
+
+export interface ChatRequestBody {
   message: string;
   userType?: 'visitor' | 'trial' | 'customer';
   tenantId?: string;
   intent?: string;
+  userId?: string;
 }
 
 interface ChatAction {
@@ -18,24 +28,27 @@ interface ChatAction {
 
 interface ChatResponse {
   text: string;
-  pricing?: typeof pricingData;
+  pricing?: PricingTier[];
   actions?: ChatAction[];
 }
 
-const pricingSummary = pricingData
-  .map((tier) => `${tier.name} (${tier.price}): ${tier.description}`)
-  .join(' | ');
+const pricingFilePath = path.join(__dirname, '../config/pricing.json');
 
-const systemPrompt = `You are Amunet AI's concierge. Answer onboarding, pricing, and booking questions concisely (1-3 sentences). Reference the pricing tiers: ${pricingSummary}. When a visitor asks for a demo, booking link, or calendar invite, include the booking link and invite them to share availability. If they request a live agent, escalate with contact details and tell them a human will follow up. Always confirm the action you are about to take.`;
+const loadPricing = async (): Promise<PricingTier[]> => {
+  const raw = await readFile(pricingFilePath, 'utf-8');
+  return JSON.parse(raw) as PricingTier[];
+};
 
-const bookingUrl = env.CALCOM_BASE_URL
-  ? `${env.CALCOM_BASE_URL.replace(/\/+$/, '')}/book/demo`
-  : 'https://cal.com/amunet/demo';
+const buildPricingSummary = (tiers: PricingTier[]) => tiers.map((tier) => `${tier.name} (${tier.price})`).join(' | ');
+
+const bookingUrl =
+  env.CALCOM_BOOKING_URL?.replace(/\/+$/, '') ||
+  `${env.CALCOM_BASE_URL.replace(/\/+$/, '')}/book/demo`;
 
 const humanChannel = env.SLACK_WEBHOOK_URL
   ? 'Slack'
   : env.TWILIO_SUPPORT_NUMBER
-  ? 'Twilio'
+  ? `Twilio (${env.TWILIO_SUPPORT_NUMBER})`
   : 'our support team';
 
 const wantsBooking = (text: string) => /\b(book|demo|trial|schedule|call)\b/i.test(text);
@@ -56,13 +69,15 @@ const buildActions = (message: string): ChatAction[] => {
     actions.push({
       type: 'notify_live_agent',
       payload: {
-        channel: humanChannel,
-        detail: env.TWILIO_SUPPORT_NUMBER ? `Call or text ${env.TWILIO_SUPPORT_NUMBER}` : 'We will reach out within 15 minutes.'
+        channel: 'Slack',
+        detail: env.TWILIO_SUPPORT_NUMBER
+          ? `Live support reachable at ${env.TWILIO_SUPPORT_NUMBER}`
+          : 'A teammate will follow up within 15 minutes.'
       }
     });
   }
 
-  if (env.SENDGRID_API_KEY && wantsEmailFollowUp(message)) {
+  if (wantsEmailFollowUp(message)) {
     actions.push({
       type: 'send_email',
       payload: {
@@ -74,14 +89,18 @@ const buildActions = (message: string): ChatAction[] => {
   return actions;
 };
 
-const fallbackText = `Thanks for reaching out. ${pricingSummary}. I can also book a demo at ${bookingUrl} or connect you with ${humanChannel}.`;
+const buildSystemPrompt = (summary: string) =>
+  `You are Amunet AI’s concierge. Answer onboarding, pricing, and booking questions concisely (1-3 sentences). Reference these pricing tiers: ${summary}. When a visitor asks for a demo, booking link, or calendar invite include ${bookingUrl}. If they request a live agent, escalate through ${humanChannel} and remind them we will follow up within minutes. Confirm the action you're taking.`;
 
-const buildOpenAIMessages = (payload: ChatRequestBody, tenantContext?: string) => {
+const buildFallbackText = (summary: string) =>
+  `Thanks for reaching out. ${summary}. You can book a demo at ${bookingUrl} or we can connect you via ${humanChannel}.`;
+
+const buildOpenAIMessages = (payload: ChatRequestBody, summary: string, tenantContext?: string) => {
   const { message, userType = 'visitor', intent } = payload;
   const systemMessages = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: buildSystemPrompt(summary) },
     { role: 'system', content: `User type: ${userType}` },
-    { role: 'system', content: `Pricing tiers: ${pricingSummary}` }
+    { role: 'system', content: `Pricing tiers: ${summary}` }
   ];
 
   if (tenantContext) {
@@ -118,14 +137,43 @@ const callOpenAI = async (messages: { role: string; content: string }[]) => {
   return response.data.choices?.[0]?.message?.content;
 };
 
+const notifyLiveAgent = async (meta: Record<string, unknown>, message: string) => {
+  try {
+    await axios.post(env.SLACK_WEBHOOK_URL, {
+      text: `Live agent requested\nMessage: ${message}\nIntent: ${meta.intent ?? 'unknown'}\nTenant: ${meta.tenantId ?? 'n/a'}\nUser: ${
+        meta.userId ?? 'anonymous'
+      }\nTimestamp: ${meta.timestamp}`
+    });
+  } catch (error: any) {
+    throw error;
+  }
+};
+
+const sendEmailFollowUp = async (meta: Record<string, unknown>, body: ChatRequestBody) => {
+  await sendSalesEmail({
+    subject: meta.intent ? `New chatbot follow-up: ${meta.intent}` : 'New chatbot lead',
+    body: [
+      `Message: ${body.message}`,
+      `User type: ${body.userType ?? 'visitor'}`,
+      `Tenant: ${body.tenantId ?? 'n/a'}`,
+      `User: ${body.userId ?? 'anonymous'}`,
+      `Timestamp: ${meta.timestamp ?? new Date().toISOString()}`,
+      `Actions: ${meta.actions?.join(', ') ?? 'none'}`
+    ].join('\n')
+  });
+};
+
 const chatbotRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: ChatRequestBody; Reply: ChatResponse }>('/chat', async (request, reply) => {
-    const { message, userType = 'visitor', tenantId, intent } = request.body;
+    const { message, userType = 'visitor', tenantId, intent, userId } = request.body;
+    const timestamp = new Date().toISOString();
 
     if (!message?.trim()) {
       return reply.status(400).send({ text: 'Please ask a question so I can help.' });
     }
 
+    const tiers = await loadPricing();
+    const pricingSummary = buildPricingSummary(tiers);
     const tenantConfig = tenantId
       ? await app.prisma.businessConfig.findFirst({
           where: { tenantId },
@@ -137,8 +185,19 @@ const chatbotRoutes: FastifyPluginAsync = async (app) => {
       ? `${tenantConfig.businessName} (industry: ${tenantConfig.industry ?? 'unknown'})`
       : undefined;
 
-    const openAiMessages = buildOpenAIMessages({ message, userType, intent }, tenantContext);
-    let botText: string = fallbackText;
+    const openAiMessages = buildOpenAIMessages({ message, userType, intent }, pricingSummary, tenantContext);
+    let botText = buildFallbackText(pricingSummary);
+
+    app.log.info(
+      {
+        tenantId,
+        userId,
+        intent,
+        timestamp,
+        message
+      },
+      'chatbot: request received'
+    );
 
     try {
       const aiContent = await callOpenAI(openAiMessages);
@@ -146,22 +205,52 @@ const chatbotRoutes: FastifyPluginAsync = async (app) => {
         botText = aiContent.trim();
       }
     } catch (error: any) {
-      app.log.error({ err: error }, 'chatbot: OpenAI request failed');
+      app.log.error({ err: error?.message ?? error }, 'chatbot: OpenAI request failed');
     }
 
     const actions = buildActions(message);
+    const meta = {
+      tenantId,
+      userId,
+      intent,
+      timestamp,
+      actions: actions.map((action) => action.type)
+    };
+
+    const backgroundJobs: Promise<void>[] = [];
+    if (actions.some((action) => action.type === 'notify_live_agent')) {
+      backgroundJobs.push(
+        notifyLiveAgent(meta, message).catch((error) => {
+          app.log.error({ err: error?.message ?? error }, 'chatbot: notify live agent failed');
+        })
+      );
+    }
+
+    if (actions.some((action) => action.type === 'send_email')) {
+      backgroundJobs.push(
+        sendEmailFollowUp(meta, request.body).catch((error) => {
+          app.log.error({ err: error?.message ?? error }, 'chatbot: send email follow-up failed');
+        })
+      );
+    }
+
+    await Promise.all(backgroundJobs);
 
     if (tenantId) {
       await app.prisma.auditLog.create({
         data: {
           tenantId,
           category: 'chatbot',
-          message: `${userType} asked: ${message}`
+          message: `${userType} asked: ${message}`,
+          metadata: meta
         }
       });
     }
 
-    return reply.send({ text: botText, pricing: pricingData, actions });
+    reply
+      .header('Access-Control-Allow-Origin', request.headers.origin ?? '*')
+      .header('Access-Control-Allow-Credentials', 'true')
+      .send({ text: botText, pricing: tiers, actions });
   });
 };
 

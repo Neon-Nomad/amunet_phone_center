@@ -13,9 +13,16 @@ interface OverviewResponse {
   uptime: string;
 }
 
+interface StatusResponse {
+  uptime: string;
+  lastUpdate: string;
+  activeCalls: number;
+}
+
 export default function DashboardHome() {
   const { tenant, axios } = useOutletContext<DashboardContext>();
   const [data, setData] = useState<OverviewResponse | null>(null);
+  const [statusInfo, setStatusInfo] = useState<StatusResponse | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,6 +44,21 @@ export default function DashboardHome() {
     fetchData();
   }, [axios, tenant?.tenantId]);
 
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const response = await axios.get<StatusResponse>('/api/status', {
+          headers: { 'x-tenant-id': tenant?.tenantId ?? 'demo-tenant' }
+        });
+        setStatusInfo(response.data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchStatus();
+  }, [axios]);
+
   return (
     <div className="space-y-8">
       <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
@@ -45,10 +67,16 @@ export default function DashboardHome() {
           Your receptionist uptime, subscription tier, and latest call summaries.
         </p>
         <div className="mt-6 grid gap-6 md:grid-cols-3">
-          <Metric label="Uptime" value={data?.uptime ?? '...'} />
+          <Metric label="Uptime" value={statusInfo?.uptime ?? data?.uptime ?? '...'} />
           <Metric label="Plan" value={data?.subscription?.tier ?? '...'} />
           <Metric label="Status" value={data?.subscription?.status ?? '...'} />
+          <Metric label="Active calls" value={statusInfo ? String(statusInfo.activeCalls) : '0'} />
         </div>
+        {statusInfo && (
+          <p className="mt-3 text-xs uppercase tracking-[0.3em] text-white/40">
+            Last updated: {new Date(statusInfo.lastUpdate).toLocaleString()}
+          </p>
+        )}
       </div>
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-2xl border border-white/5 bg-white/5 p-6">
