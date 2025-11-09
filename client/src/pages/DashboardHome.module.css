@@ -2,7 +2,7 @@
 
 .dashboardPage {
   font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif;
-  background-color: #f9f7ff;
+  background-color: #f7f7fb;
   color: #1f1f2a;
   position: relative;
   overflow: hidden;
@@ -11,12 +11,12 @@
 .particleCanvas {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 20% 20%, rgba(157, 0, 255, 0.25), transparent 35%),
-    radial-gradient(circle at 80% 10%, rgba(255, 195, 0, 0.25), transparent 30%),
-    radial-gradient(circle at 50% 80%, rgba(255, 248, 200, 0.4), transparent 40%);
+  background: radial-gradient(circle at 10% 10%, rgba(255, 195, 0, 0.15), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(124, 58, 237, 0.15), transparent 35%),
+    radial-gradient(circle at 50% 70%, rgba(37, 99, 235, 0.06), transparent 45%);
   opacity: 0.6;
   mix-blend-mode: screen;
-  animation: floatParticles 24s linear infinite;
+  animation: floatParticles 30s linear infinite;
   pointer-events: none;
   z-index: 0;
 }
@@ -31,9 +31,9 @@
 
 .sectionTitle {
   font-family: 'Orbitron', 'Rajdhani', sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   text-transform: uppercase;
-  letter-spacing: 0.25em;
+  letter-spacing: 0.35em;
   color: #5b21b6;
 }
 
@@ -45,11 +45,19 @@
   color: #a855f7;
 }
 
+.lightCard {
+  background: #ffffff;
+  border: 1px solid #ece9f5;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+}
+
 .shimmerBlock {
   display: inline-block;
   height: 1rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.05));
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.04), rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.04));
   position: relative;
   overflow: hidden;
 }
@@ -66,15 +74,15 @@
   display: flex;
   gap: 0.65rem;
   align-items: flex-end;
-  height: 90px;
-  margin-top: 1.5rem;
+  height: 100px;
+  margin-top: 1rem;
 }
 
 .trendBar {
   flex: 1;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 195, 0, 0.85), rgba(17, 24, 39, 0.1));
-  box-shadow: 0 0 18px rgba(255, 195, 0, 0.35);
+  background: linear-gradient(180deg, rgba(255, 195, 0, 0.9), rgba(255, 195, 0, 0.2));
+  box-shadow: 0 12px 24px rgba(255, 195, 0, 0.25);
   position: relative;
   overflow: hidden;
 }
@@ -84,13 +92,13 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2));
-  opacity: 0.9;
+  opacity: 0.7;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -101,11 +109,11 @@
 @keyframes pulseSlow {
   0%,
   100% {
-    opacity: 0.7;
+    opacity: 0.8;
   }
   50% {
     opacity: 1;
-    transform: scale(1.03);
+    transform: scale(1.02);
   }
 }
 

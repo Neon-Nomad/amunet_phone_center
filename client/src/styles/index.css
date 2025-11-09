@@ -4,6 +4,8 @@
 
 body {
   font-family: theme('fontFamily.body');
+  background: #f7f7fb;
+  color: #1f1f2a;
 }
 
 .bg-grid {

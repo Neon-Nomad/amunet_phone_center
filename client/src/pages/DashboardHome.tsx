@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { CalendarDaysIcon, PhoneIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ChartBarIcon, SparklesIcon } from '@heroicons/react/24/outline';
 
 import styles from './DashboardHome.module.css';
 
@@ -22,8 +22,11 @@ interface StatusResponse {
   activeCalls: number;
 }
 
-const glassCard =
-  'bg-white shadow-[0_15px_30px_rgba(56,21,70,0.12)] border border-[#e6d3ff] rounded-xl p-6 transition hover:shadow-[0_25px_50px_rgba(255,195,0,0.25)] hover:-translate-y-1 duration-300';
+const statDeck = [
+  { label: 'Demo Activation Point', footnote: 'Metric · Cumulative | 30 days' },
+  { label: 'Created Invoice', footnote: 'Metric · Cumulative | 30 days' },
+  { label: 'Total Conversion Rate', footnote: 'Metric · Conversion Rate | 90 days' }
+];
 
 const uptimeTrend = [98.6, 99.1, 99.4, 99.7, 99.6, 99.85, 99.95];
 
@@ -73,41 +76,34 @@ export default function DashboardHome() {
 
   const uptimeValue = statusInfo?.uptime ?? data?.uptime;
   const lastUpdated = statusInfo ? new Date(statusInfo.lastUpdate).toLocaleTimeString() : null;
-  const planTier = data?.subscription?.tier ?? '...';
-  const planStatus = data?.subscription?.status ?? '...';
-  const activeCalls = statusInfo?.activeCalls;
-  const typesetCalls = data?.calls ?? [];
-  const bookings = data?.bookings ?? [];
+  const planTier = data?.subscription?.tier ?? 'Starter';
+  const planStatus = data?.subscription?.status ?? 'Active';
+  const callCount = data?.calls.length ?? 0;
+  const bookingCount = data?.bookings.length ?? 0;
   const maxTrend = useMemo(() => Math.max(...uptimeTrend), []);
 
   const renderCalls = () => {
     if (!data) {
       return Array.from({ length: 3 }).map((_, index) => (
-        <div
-          key={`call-loading-${index}`}
-          className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0"
-        >
-          {renderPlaceholder(120, 16)}
-          {renderPlaceholder(60, 14)}
+        <div key={index} className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0">
+          {renderPlaceholder(140, 16)}
+          {renderPlaceholder(90, 14)}
         </div>
       ));
     }
 
-    if (!typesetCalls.length) {
-      return <p className="text-sm text-slate-500">No calls logged yet.</p>;
+    if (!data.calls.length) {
+      return <p className="text-sm text-slate-500">No calls available.</p>;
     }
 
-    return typesetCalls.slice(0, 3).map((call) => (
-      <div
-        key={call.id}
-        className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0"
-      >
+    return data.calls.slice(0, 3).map((call) => (
+      <div key={call.id} className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0">
         <div>
-          <p className="text-sm font-medium text-slate-900">{call.fromNumber}</p>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">{call.status}</p>
+          <p className="text-sm font-semibold text-slate-900">{call.fromNumber}</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">{call.status}</p>
         </div>
         <div className="text-right">
-          <p className="text-lg font-semibold text-[#9D00FF]">{call.duration ? `${call.duration}s` : '—'}</p>
+          <p className="text-lg font-bold text-[#9d00ff]">{call.duration ? `${call.duration}s` : '—'}</p>
           <p className="text-xs text-slate-400">{new Date(call.createdAt).toLocaleTimeString()}</p>
         </div>
       </div>
@@ -117,128 +113,123 @@ export default function DashboardHome() {
   const renderBookings = () => {
     if (!data) {
       return Array.from({ length: 3 }).map((_, index) => (
-        <div
-          key={`booking-loading-${index}`}
-          className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0"
-        >
-          {renderPlaceholder(140, 16)}
-          {renderPlaceholder(90, 14)}
+        <div key={index} className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0">
+          {renderPlaceholder(120, 16)}
+          {renderPlaceholder(100, 14)}
         </div>
       ));
     }
 
-    if (!bookings.length) {
-      return <p className="text-sm text-slate-500">No bookings scheduled.</p>;
+    if (!data.bookings.length) {
+      return <p className="text-sm text-slate-500">No upcoming bookings.</p>;
     }
 
-    return bookings.slice(0, 3).map((booking) => (
-      <div
-        key={booking.id}
-        className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0"
-      >
+    return data.bookings.slice(0, 3).map((booking) => (
+      <div key={booking.id} className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0">
         <div>
-          <p className="text-sm font-medium text-slate-900">{booking.customerName}</p>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Upcoming slot</p>
+          <p className="text-sm font-semibold text-slate-900">{booking.customerName}</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Scheduled slot</p>
         </div>
         <p className="text-xs text-slate-400">{new Date(booking.scheduledFor).toLocaleString()}</p>
       </div>
     ));
   };
 
+  const highlightValue = (index: number) => {
+    if (!data) return '...';
+    if (index === 0) return `${callCount}`;
+    if (index === 1) return `${bookingCount}`;
+    return `${uptimeValue ?? '99.9%'} uptime`;
+  };
+
   return (
-    <div className={`${styles.dashboardPage} min-h-screen px-6 py-10 text-slate-900`}>
-      <div className={styles.particleCanvas} aria-hidden />
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 relative z-10">
-        <header className="space-y-2 text-center">
-          <p className={styles.headerAccent}>Amunet AI</p>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
-            Live Intelligence Dashboard
-          </h1>
-          <p className="text-sm text-slate-600">
-            Monitor uptime, calls, and bookings in a data-first view tailored for your AI receptionist.
-          </p>
+    <div className={`${styles.dashboardPage} min-h-screen py-10`}>
+      <div className="mx-auto max-w-6xl space-y-6 px-4">
+        <header className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-[0.55em] text-slate-400">All dashboards</div>
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h1 className="text-4xl font-semibold text-slate-900">Free Trial to Paid Conversion</h1>
+              <p className="text-sm text-slate-500">
+                This dashboard tracks new signups that convert to paying customers, and highlights the trends
+                that drive bookings.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                Select time period
+              </button>
+              <button className="rounded-full bg-[#6c4bff] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#6c4bff]/40 transition hover:bg-[#5a3ae0]">
+                Add filters
+              </button>
+            </div>
+          </div>
         </header>
 
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <article className={`${glassCard} ${styles.animateFadeIn} md:col-span-2 relative overflow-hidden`}>
-            <div className="flex flex-col gap-6">
+        <section className="grid gap-4 md:grid-cols-3">
+          {statDeck.map((stat, index) => (
+            <div key={stat.label} className={`${styles.lightCard} ${styles.animateFadeIn}`}>
+              <p className="text-xs uppercase tracking-[0.4em] text-slate-400">{stat.footnote}</p>
+              <h2 className="mt-3 text-lg font-semibold text-slate-900">{stat.label}</h2>
+              <div className="mt-4 flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-slate-900">{highlightValue(index)}</span>
+                <span className="text-sm text-slate-500">Users</span>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <section className="grid gap-5">
+          <article className={`${styles.lightCard} ${styles.animateFadeIn}`}>
+            <div className="flex items-center justify-between">
+              <div className="inline-flex items-center gap-2">
+                <span className="rounded-full bg-[#facc15] p-2 text-white shadow-lg shadow-[#facc15]/50">
+                  <ChartBarIcon className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Free trial to paid conversion trend</p>
+                  <p className="text-sm text-slate-400">Conversion trends | Last 90 days</p>
+                </div>
+              </div>
+              <span className="text-xs font-semibold text-slate-500">{lastUpdated ? `Updated ${lastUpdated}` : 'Updating...'}</span>
+            </div>
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Total conversion rate</p>
+                <p className="text-2xl font-semibold text-slate-900">{uptimeValue ?? '99.9%'}</p>
+              </div>
+              <div className={styles.trendChart}>
+                {uptimeTrend.map((value, index) => (
+                  <span
+                    key={index}
+                    className={styles.trendBar}
+                    style={{ height: `${Math.min(100, Math.max(30, (value / maxTrend) * 100))}%` }}
+                  />
+                ))}
+              </div>
+            </div>
+          </article>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <article className={`${styles.lightCard} ${styles.animateFadeIn}`}>
               <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#FACC15] p-3 shadow-lg shadow-[#FACC15]/40">
-                  <HeartIcon className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <p className={`${styles.sectionTitle}`}>Realtime Status</p>
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Amunet AI Concierge</p>
-                </div>
+                <span className="rounded-full bg-[#8b5cf6] p-2 text-white shadow-lg shadow-[#8b5cf6]/30">
+                  <SparklesIcon className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-semibold text-slate-900">Recent calls</p>
               </div>
-
-              <div className="grid gap-6 md:grid-cols-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500">uptime</p>
-                  <p className="mt-2 text-4xl font-semibold text-slate-900">{uptimeValue ?? renderPlaceholder(90)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500">plan</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900">{planTier}</p>
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{planStatus}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500">active calls</p>
-                  <p className={`mt-2 text-4xl font-bold text-[#9D00FF] ${styles.animatePulseSlow}`}>
-                    {activeCalls ?? renderPlaceholder(32)}
-                  </p>
-                </div>
+              <div className="mt-4 space-y-2 text-sm text-slate-700">{renderCalls()}</div>
+            </article>
+            <article className={`${styles.lightCard} ${styles.animateFadeIn}`}>
+              <div className="flex items-center gap-3">
+                <span className="rounded-full bg-[#0ea5e9] p-2 text-white shadow-lg shadow-[#0ea5e9]/30">
+                  <CalendarDaysIcon className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-semibold text-slate-900">Upcoming bookings</p>
               </div>
-
-              <div className="flex flex-col gap-2 text-xs uppercase tracking-[0.35em] text-slate-500">
-                <span>status</span>
-                <span className="font-semibold text-slate-900">{lastUpdated ? `Last update: ${lastUpdated}` : renderPlaceholder(120)}</span>
-              </div>
-
-              <div className="w-full">
-                <div className={`${styles.trendChart}`}>
-                  {uptimeTrend.map((value, index) => (
-                    <div
-                      key={`trend-${index}`}
-                      className={styles.trendBar}
-                      style={{
-                        height: `${Math.min(100, Math.max(30, (value / maxTrend) * 100))}%`
-                      }}
-                    />
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-slate-500">
-                  Uptime trend reflects the last seven checks, ensuring your AI concierge stays resilient.
-                </p>
-              </div>
-            </div>
-          </article>
-
-          <article className={`${glassCard} ${styles.animateFadeIn}`}>
-            <div className="flex items-center justify-center gap-3">
-              <div className="rounded-2xl bg-gradient-to-br from-[#8b5cf6] to-[#facc15] p-3 shadow-lg shadow-[#facc15]/30">
-                <PhoneIcon className="h-6 w-6 text-white" />
-              </div>
-              <div className="text-center">
-                <p className={`${styles.sectionTitle} text-[0.9rem]`}>Recent Calls</p>
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Inbound Activity</p>
-              </div>
-            </div>
-            <div className="mt-6 space-y-4">{renderCalls()}</div>
-          </article>
-
-          <article className={`${glassCard} ${styles.animateFadeIn}`}>
-            <div className="flex items-center justify-center gap-3">
-              <div className="rounded-2xl bg-gradient-to-br from-[#facc15]/80 to-[#d97706] p-3 shadow-lg shadow-[#facc15]/30">
-                <CalendarDaysIcon className="h-6 w-6 text-white" />
-              </div>
-              <div className="text-center">
-                <p className={`${styles.sectionTitle} text-[0.9rem]`}>Upcoming Bookings</p>
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Scheduled Leads</p>
-              </div>
-            </div>
-            <div className="mt-6 space-y-4">{renderBookings()}</div>
-          </article>
+              <div className="mt-4 space-y-2 text-sm text-slate-700">{renderBookings()}</div>
+            </article>
+          </div>
         </section>
       </div>
     </div>
