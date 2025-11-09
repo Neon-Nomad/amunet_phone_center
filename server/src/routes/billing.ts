@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { assertTenant } from '../lib/tenant';
 import { env } from '../config/env';
 import { getStripeClient } from '../lib/stripe';
+import { metrics } from '../lib/metrics';
 import { BillingService } from '../services/billingService';
 
 const checkoutSchema = z.object({
@@ -64,62 +65,81 @@ export default async function billingRoutes(app: FastifyInstance) {
     return reply.send(session);
   });
 
-  app.post('/webhook', { config: { rawBody: true } }, async (request, reply) => {
-    const stripe = getStripeClient();
-    const secret = env.STRIPE_WEBHOOK_SECRET;
-    if (!stripe || !secret) {
-      return reply.status(400).send({ error: 'Stripe webhook not configured' });
-    }
-
-    const rawBody = request.rawBody as string | undefined;
-    const signature = request.headers['stripe-signature'] as string | undefined;
-    if (!rawBody || !signature) {
-      return reply.status(400).send({ error: 'Missing Stripe payload or signature' });
-    }
-
-    let event: Stripe.Event;
-    try {
-      event = stripe.webhooks.constructEvent(rawBody, signature, secret);
-    } catch (error) {
-      app.log.error({ err: error as Error, rawBody, signature }, 'Stripe signature validation failed');
-      return reply.status(400).send({ error: 'Invalid Stripe signature' });
-    }
-
-    const existingLog = await app.prisma.auditLog.findFirst({
-      where: {
-        category: 'billing_webhook',
-        message: { contains: event.id }
+  app.post(
+    '/webhook',
+    {
+      config: {
+        rawBody: true,
+        rateLimit: {
+          max: 100,
+          timeWindow: '1 minute'
+        }
       }
-    });
+    },
+    async (request, reply) => {
+      const stripe = getStripeClient();
+      const secret = env.STRIPE_WEBHOOK_SECRET;
+      if (!stripe || !secret) {
+        return reply.status(400).send({ error: 'Stripe webhook not configured' });
+      }
 
-    if (existingLog) {
-      app.log.info({ eventId: event.id }, 'Webhook already processed');
-      return reply.send({ received: true, duplicate: true });
-    }
+      const rawBody = request.rawBody as string | undefined;
+      const signature = request.headers['stripe-signature'] as string | undefined;
+      if (!rawBody || !signature) {
+        return reply.status(400).send({ error: 'Missing Stripe payload or signature' });
+      }
 
-    let tenantId: string | null = null;
-    try {
-      tenantId = await handleStripeEvent(app, event);
-    } catch (error) {
-      app.log.error(
-        { err: error as Error, eventId: event.id, eventType: event.type },
-        'Webhook processing failed'
-      );
-      return reply.status(500).send({ error: 'Processing failed', eventId: event.id });
-    }
+      let event: Stripe.Event;
+      try {
+        event = stripe.webhooks.constructEvent(rawBody, signature, secret);
+      } catch (error) {
+        app.log.error({ err: error as Error, rawBody, signature }, 'Stripe signature validation failed');
+        return reply.status(400).send({ error: 'Invalid Stripe signature' });
+      }
 
-    if (tenantId) {
-      await app.prisma.auditLog.create({
-        data: {
-          tenantId,
+      metrics.increment('stripe.webhook.received', { event_type: event.type });
+
+      const existingLog = await app.prisma.auditLog.findFirst({
+        where: {
           category: 'billing_webhook',
-          message: `Stripe event ${event.type}: ${event.id}`
+          message: { contains: event.id }
         }
       });
-    }
 
-    return reply.send({ received: true });
-  });
+      if (existingLog) {
+        app.log.info({ eventId: event.id }, 'Webhook already processed');
+        return reply.send({ received: true, duplicate: true });
+      }
+
+      let tenantId: string | null = null;
+      try {
+        tenantId = await handleStripeEvent(app, event);
+      } catch (error) {
+        app.log.error(
+          { err: error as Error, eventId: event.id, eventType: event.type },
+          'Webhook processing failed'
+        );
+        return reply.status(500).send({ error: 'Processing failed', eventId: event.id });
+      }
+
+      if (tenantId) {
+        await app.prisma.auditLog.create({
+          data: {
+            tenantId,
+            category: 'billing_webhook',
+            message: `Stripe event ${event.type}: ${event.id}`
+          }
+        });
+      }
+
+      metrics.increment('stripe.webhook.processed', {
+        event_type: event.type,
+        status: tenantId ? 'success' : 'ignored'
+      });
+
+      return reply.send({ received: true });
+    }
+  );
 }
 
 async function handleStripeEvent(app: FastifyInstance, event: Stripe.Event): Promise<string | null> {
@@ -131,6 +151,8 @@ async function handleStripeEvent(app: FastifyInstance, event: Stripe.Event): Pro
       app.log.warn({ eventType: event.type }, 'Unhandled Stripe event type');
       return null;
   }
+
+  // Future: publish to a webhook queue for async processing (retryable, decoupled).
 }
 
 async function handleSubscriptionEvent(app: FastifyInstance, subscription: Stripe.Subscription) {
