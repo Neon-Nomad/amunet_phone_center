@@ -1,0 +1,19 @@
+{
+  "name": "amunet_phone_center",
+  "version": "1.0.0",
+  "description": "Full-stack AI receptionist and booking SaaS. Handles calls, chat, scheduling, and billing with Twilio, OpenAI, Stripe, and ElevenLabs.",
+  "scripts": {
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "build": "cd client && npm run build && cd ../server && npm run build",
+    "test": "cd server && npm run test",
+    "start": "cd server && npm start"
+  },
+  "dependencies": {
+    "concurrently": "^9.0.0"
+  },
+  "author": "Paul Dillon (Amunet AI)",
+  "license": "MIT"
+}
