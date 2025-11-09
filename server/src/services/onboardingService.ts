@@ -132,6 +132,8 @@ export class OnboardingService {
         }
       );
 
+      console.info('OPENAI onboarding response:', response.data);
+
       const data = JSON.parse(response.data.choices?.[0]?.message?.content ?? '{}');
       return {
         industry: data.industry ?? fallback.industry,
@@ -139,7 +141,10 @@ export class OnboardingService {
         keywords: data.keywords ?? fallback.keywords,
         websiteUrl: data.websiteUrl ?? fallback.websiteUrl
       };
-    } catch (error) {
+    } catch (error: any) {
+      console.error('!!!!!!!!!! OPENAI ONBOARDING FAILED !!!!!!!!!!');
+      console.error(error.response?.data ?? error.message ?? error);
+      console.error('!!!!!!!!!! END OF OPENAI ERROR !!!!!!!!!!');
       return fallback;
     }
   }
