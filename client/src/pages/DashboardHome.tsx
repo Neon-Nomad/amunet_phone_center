@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { CalendarDaysIcon, HeadsetIcon, HeartPulseIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, PhoneIcon, HeartIcon } from '@heroicons/react/24/outline';
 
 import styles from './DashboardHome.module.css';
 
@@ -152,7 +152,7 @@ export default function DashboardHome() {
             <div className="flex flex-col gap-6">
               <div className="flex items-center gap-3">
                 <div className="rounded-2xl bg-gradient-to-br from-[#9D00FF] to-purple-500/70 p-3 shadow-lg shadow-[#9D00FF]/40">
-                  <HeartPulseIcon className="h-6 w-6 text-white" />
+                  <HeartIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
                   <p className={`${styles.sectionTitle}`}>Realtime Status</p>
@@ -205,7 +205,7 @@ export default function DashboardHome() {
           <article className={`${glassCard} ${styles.animateFadeIn}`}>
             <div className="flex items-center justify-center gap-3">
               <div className="rounded-2xl bg-gradient-to-br from-indigo-500/70 to-purple-500/50 p-3 shadow-lg shadow-indigo-700/50">
-                <HeadsetIcon className="h-6 w-6 text-white" />
+                <PhoneIcon className="h-6 w-6 text-white" />
               </div>
               <div className="text-center">
                 <p className={`${styles.sectionTitle} text-[0.9rem]`}>Recent Calls</p>
