@@ -23,15 +23,15 @@ export default function DashboardLayout() {
   }, []);
 
   const linkClass = (path: string) =>
-    `rounded-lg px-4 py-2 text-sm ${location.pathname === path ? 'bg-primary text-white' : 'text-white/70 hover:text-white'}`;
+    `rounded-lg px-4 py-2 text-sm ${location.pathname === path ? 'bg-[#6c4bff] text-white' : 'text-slate-500 hover:text-slate-900'}`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <div className="border-b border-white/5 bg-dark">
+    <div className="min-h-screen bg-[#f7f7fb] text-slate-900">
+      <div className="border-b border-slate-200 bg-white/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
-            <p className="font-display text-xl">Amunet Dashboard</p>
-            <p className="text-xs text-white/50">Tenant: {tenant?.tenantId ?? 'demo-tenant'}</p>
+            <p className="font-display text-xl text-slate-900">Amunet Dashboard</p>
+            <p className="text-xs text-slate-500">Tenant: {tenant?.tenantId ?? 'demo-tenant'}</p>
           </div>
           <nav className="flex gap-3">
             <a className={linkClass('/dashboard')} href="/dashboard">
