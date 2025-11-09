@@ -11,9 +11,14 @@ export default function DashboardLayout() {
   const location = useLocation();
 
   useEffect(() => {
-    const stored = window.localStorage.getItem('amunet-tenant');
-    if (stored) {
-      setTenant(JSON.parse(stored));
+    try {
+      const stored = window.localStorage.getItem('amunet-tenant');
+      if (stored) {
+        setTenant(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Failed to parse tenant from localStorage', error);
+      window.localStorage.removeItem('amunet-tenant');
     }
   }, []);
 
