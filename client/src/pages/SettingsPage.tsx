@@ -86,5 +86,3 @@ export default function SettingsPage() {
     </form>
   );
 }
-client/src/sections/Hero.tsx
-N
