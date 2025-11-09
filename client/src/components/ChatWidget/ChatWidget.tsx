@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ChatBubbleOvalLeftEllipsisIcon } from '@heroicons/react/24/outline';
 
 import ChatBubble from './ChatBubble';
 import { queryChatbot, type ChatAction, type ChatResponse } from './ChatAPI';
@@ -196,7 +197,7 @@ export default function ChatWidget() {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label="Open chat"
       >
-        {isOpen ? '×' : '??'}
+        {isOpen ? 'x' : <ChatBubbleOvalLeftEllipsisIcon className="h-6 w-6" />}
       </button>
     </div>
   );

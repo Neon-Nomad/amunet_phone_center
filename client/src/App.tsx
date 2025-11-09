@@ -9,7 +9,7 @@ import ChatWidget from './components/ChatWidget/ChatWidget';
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-dark text-white">
+    <div className="min-h-screen bg-[#f7f7fb] text-slate-900">
       <Header />
       <main>
         <Hero />

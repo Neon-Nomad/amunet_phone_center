@@ -14,31 +14,31 @@ export default function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-dark/80 backdrop-blur border-b border-white/5">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 text-sm">
-        <a href="#" className="font-display text-lg font-semibold text-white">
+        <a href="#" className="font-display text-lg font-semibold text-slate-900">
           Amunet AI
         </a>
-        <nav className="hidden gap-8 text-sm text-white/80 lg:flex">
+        <nav className="hidden gap-8 text-sm text-slate-500 lg:flex">
           {navLinks.map((link) => (
-            <a key={link.label} href={link.href} className="hover:text-white">
+            <a key={link.label} href={link.href} className="hover:text-slate-900">
               {link.label}
             </a>
           ))}
         </nav>
         <div className="hidden items-center gap-4 lg:flex">
-          <Link to="/login" className="text-white/70 hover:text-white">
+          <Link to="/login" className="text-slate-500 hover:text-slate-900">
             Login
           </Link>
           <a
             href="/dashboard"
-            className="rounded-full bg-primary px-4 py-2 text-white shadow-lg shadow-primary/20 transition hover:-translate-y-0.5"
+            className="rounded-full bg-[#6c4bff] px-4 py-2 text-white shadow-lg shadow-[#6c4bff]/20 transition hover:-translate-y-0.5"
           >
             Launch Dashboard
           </a>
         </div>
         <button
-          className="inline-flex items-center rounded-full border border-white/20 p-2 text-white lg:hidden"
+          className="inline-flex items-center rounded-full border border-slate-200 bg-white p-2 text-slate-600 lg:hidden"
           onClick={() => setOpen((value) => !value)}
           aria-label="Toggle navigation"
         >
@@ -51,17 +51,20 @@ export default function Header() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="flex flex-col gap-4 border-t border-white/5 bg-dark/95 px-6 py-4 lg:hidden"
+            className="flex flex-col gap-4 border-t border-slate-100 bg-white px-6 py-4 lg:hidden"
           >
             {navLinks.map((link) => (
-              <a key={link.label} href={link.href} className="text-white/80" onClick={() => setOpen(false)}>
+              <a key={link.label} href={link.href} className="text-slate-600" onClick={() => setOpen(false)}>
                 {link.label}
               </a>
             ))}
-            <Link to="/login" className="text-white/70">
+            <Link to="/login" className="text-slate-600">
               Login
             </Link>
-            <a href="/dashboard" className="rounded-full bg-primary px-4 py-2 text-center text-white">
+            <a
+              href="/dashboard"
+              className="rounded-full bg-[#6c4bff] px-4 py-2 text-center text-white shadow-lg shadow-[#6c4bff]/20"
+            >
               Launch Dashboard
             </a>
           </motion.nav>

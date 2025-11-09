@@ -1,4 +1,4 @@
-const testimonials = [
+﻿const testimonials = [
   {
     name: 'Jordan Lee',
     role: 'Head of Operations, Meridian Clinics',
@@ -18,15 +18,15 @@ const testimonials = [
 
 export default function Testimonials() {
   return (
-    <section id="testimonials" className="bg-dark py-24 text-white">
+    <section id="testimonials" className="bg-transparent py-24 text-slate-900">
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid gap-6 md:grid-cols-3">
           {testimonials.map((testimonial) => (
-            <div key={testimonial.name} className="rounded-2xl border border-white/5 bg-white/5 p-6">
-              <p className="text-sm text-white/80">“{testimonial.quote}”</p>
+            <div key={testimonial.name} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-100">
+              <p className="text-sm text-slate-500">&ldquo;{testimonial.quote}&rdquo;</p>
               <div className="mt-6">
-                <p className="font-display text-sm text-white">{testimonial.name}</p>
-                <p className="text-xs uppercase tracking-[0.25em] text-white/40">{testimonial.role}</p>
+                <p className="font-display text-sm text-slate-900">{testimonial.name}</p>
+                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{testimonial.role}</p>
               </div>
             </div>
           ))}
