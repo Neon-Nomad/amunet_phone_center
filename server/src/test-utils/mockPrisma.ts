@@ -126,7 +126,9 @@ export function createMockPrisma() {
     subscription: {
       create: makeCreate('subscription'),
       findFirst: makeFindFirst('subscription'),
-      update: makeUpdate('subscription')
+      findUnique: makeFindUnique('subscription'),
+      update: makeUpdate('subscription'),
+      updateMany: makeUpdateMany('subscription')
     },
     businessConfig: {
       create: makeCreate('businessConfig'),

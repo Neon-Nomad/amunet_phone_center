@@ -2,28 +2,28 @@ import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 
 import { env } from '../config/env';
+import { getStripeClient } from '../lib/stripe';
 
 export type BillingTier = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
 export class BillingService {
-  private readonly stripe: Stripe | null;
-
-  constructor(private readonly prisma: PrismaClient) {
-    this.stripe = env.STRIPE_SECRET_KEY ? new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: '2023-08-16' }) : null;
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
   async createCheckoutSession({
     tier,
     tenantId,
     successUrl,
-    cancelUrl
+    cancelUrl,
+    customerEmail
   }: {
     tier: BillingTier;
     tenantId: string;
     successUrl: string;
     cancelUrl: string;
+    customerEmail: string;
   }) {
-    if (!this.stripe) {
+    const stripe = getStripeClient();
+    if (!stripe) {
       return {
         url: `${successUrl}?tenantId=${tenantId}&tier=${tier}&mode=demo`
       };
@@ -34,24 +34,9 @@ export class BillingService {
       throw new Error(`Stripe price not configured for tier ${tier}`);
     }
 
-    const subscription = await this.prisma.subscription.findFirst({ where: { tenantId } });
-    if (!subscription) {
-      throw new Error('Subscription not found');
-    }
+    const { customerId } = await this.findOrCreateCustomer(tenantId, customerEmail, stripe);
 
-    let customerId = subscription.stripeCustomer;
-    if (!customerId) {
-      const customer = await this.stripe.customers.create({
-        metadata: { tenantId }
-      });
-      customerId = customer.id;
-      await this.prisma.subscription.update({
-        where: { id: subscription.id },
-        data: { stripeCustomer: customerId }
-      });
-    }
-
-    const session = await this.stripe.checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       metadata: { tenantId },
@@ -69,11 +54,12 @@ export class BillingService {
   }
 
   async createCustomerPortalSession(customerId: string, returnUrl: string) {
-    if (!this.stripe) {
+    const stripe = getStripeClient();
+    if (!stripe) {
       return { url: `${returnUrl}?portal=disabled` };
     }
 
-    const session = await this.stripe.billingPortal.sessions.create({
+    const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: returnUrl
     });
@@ -92,5 +78,31 @@ export class BillingService {
       default:
         return undefined;
     }
+  }
+
+  private async findOrCreateCustomer(tenantId: string, email: string, stripe: Stripe) {
+    if (!email?.includes('@')) {
+      throw new Error('Valid email required for Stripe customer');
+    }
+
+    const subscription = await this.prisma.subscription.findFirst({ where: { tenantId } });
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    let customerId = subscription.stripeCustomer;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email,
+        metadata: { tenantId }
+      });
+      customerId = customer.id;
+      await this.prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { stripeCustomer: customerId }
+      });
+    }
+
+    return { subscription, customerId };
   }
 }

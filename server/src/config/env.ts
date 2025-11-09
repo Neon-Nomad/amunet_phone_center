@@ -12,6 +12,7 @@ const envSchema = z.object({
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
   CALCOM_API_KEY: z.string().optional(),
   CALCOM_BASE_URL: z.string().optional().default('https://api.cal.com/v2'),
   STRIPE_STARTER_PRICE_ID: z.string().optional(),

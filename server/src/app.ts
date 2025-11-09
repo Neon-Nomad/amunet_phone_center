@@ -3,10 +3,12 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import formBody from '@fastify/formbody';
 import rateLimit from '@fastify/rate-limit';
+import fastifyRawBody from 'fastify-raw-body';
 
 import { PrismaClient } from '@prisma/client';
 
 import { env } from './config/env';
+import { TenantMissingError } from './lib/tenant';
 import authRoutes from './routes/auth';
 import onboardingRoutes from './routes/onboarding';
 import twilioRoutes from './routes/twilio';
@@ -34,6 +36,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     timeWindow: '1 minute'
   });
 
+  await app.register(fastifyRawBody, {
+    field: 'rawBody',
+    global: false,
+    runFirst: true,
+    encoding: 'utf8',
+    bodyLimit: 1_000_000 // allow up to 1MB payloads (Stripe is small)
+  });
+
   if (options.prismaClient) {
     app.decorate('prisma', options.prismaClient);
   } else {
@@ -48,6 +58,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(schedulingRoutes, { prefix: '/api/scheduling' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
   await app.register(configRoutes, { prefix: '/api/config' });
+
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof TenantMissingError) {
+      return reply.status(error.statusCode ?? 400).send({
+        error: 'Bad Request',
+        message: error.message
+      });
+    }
+
+    // Default Fastify handler
+    reply.send(error);
+  });
 
   return app;
 }

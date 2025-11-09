@@ -123,6 +123,13 @@ is persisted.
 
 All tenant-specific endpoints require the `x-tenant-id` header.
 
+## Stripe Webhooks
+
+- `/api/billing/webhook` receives Stripe `customer.subscription.*` events and relies on `fastify-raw-body` so the raw payload can be passed to `Stripe.webhooks.constructEvent`.
+- Set `STRIPE_WEBHOOK_SECRET` to the Signing Secret provided in the Stripe dashboard. Stripe CLI (`stripe listen --forward-to`) is helpful for asserting the endpoint and signature.
+- The handler updates the Prisma `Subscription` status and `stripeSubId` so the dashboard reflects Stripe’s source of truth and you can reconcile failed renewal states.
+- Monitor webhook health through Stripe’s Webhook dashboard (Notifications → Webhooks) and add alerts around failed deliveries so retries receive human follow-up; logging unsuccessful verifications (e.g., invalid signatures) into your observability stack helps with long-term tracking.
+
 ## Frontend Overview
 
 - Premium landing page with sticky navigation, hero parallax, feature carousel, pricing tiers, onboarding timeline, and
@@ -142,3 +149,4 @@ All tenant-specific endpoints require the `x-tenant-id` header.
 - Configure Redis (via `REDIS_URL`) for rate limiting and background jobs if required.
 - Wire CI/CD to run `npm install`, `npm run build`, and `npm test`.
 - Provision infrastructure per `agents.md` guidelines (Render/Fly.io backend, Vercel frontend, managed Postgres).
+

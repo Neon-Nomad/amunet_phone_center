@@ -6,6 +6,8 @@ import { buildApp } from '../app';
 import { env } from '../config/env';
 import { createTwilioSignature } from '../lib/twilio';
 import { createMockPrisma } from '../test-utils/mockPrisma';
+import Stripe from 'stripe';
+import * as stripeLib from '../lib/stripe';
 
 const axiosPost = vi.fn();
 
@@ -54,6 +56,8 @@ describe('amunet platform flows', () => {
 
   afterEach(async () => {
     await app.close();
+    stripeLib.setStripeClientForTesting(null);
+    env.STRIPE_WEBHOOK_SECRET = undefined;
   });
 
   it('runs onboarding → telephony → booking E2E', async () => {
@@ -345,5 +349,128 @@ describe('amunet platform flows', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().status).toBe('provider-failed');
+  });
+
+  it('accepts tenantId from query string on Twilio voice webhooks', async () => {
+    const onboardingResponse = await app.inject({
+      method: 'POST',
+      url: '/api/onboarding/start',
+      payload: {
+        businessName: 'Query Tenant',
+        email: 'query@tenant.com',
+        tier: 'STARTER'
+      }
+    });
+    const tenantId = onboardingResponse.json().tenantId;
+    const payload = {
+      CallSid: 'CA-query',
+      From: '+1000000',
+      To: '+2000000',
+      CallStatus: 'queued'
+    };
+    const path = `/api/twilio/voice?tenantId=${tenantId}`;
+    const signature = createTwilioSignature(`https://${context.host}${path}`, payload);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: path,
+      headers: {
+        host: context.host,
+        'x-forwarded-proto': 'https',
+        'x-twilio-signature': signature
+      },
+      payload
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('rejects billing portal access for another tenant customer', async () => {
+    const { client } = context.prisma;
+    const tenantA = await client.tenant.create({ data: { name: 'Tenant A' } } as any);
+    const tenantB = await client.tenant.create({ data: { name: 'Tenant B' } } as any);
+    await client.subscription.create({
+      data: {
+        tenantId: tenantA.id,
+        tier: 'PROFESSIONAL',
+        status: 'ACTIVE',
+        meteredMinutes: 0,
+        stripeCustomer: 'cus_tenant_a'
+      }
+    } as any);
+    await client.subscription.create({
+      data: {
+        tenantId: tenantB.id,
+        tier: 'PROFESSIONAL',
+        status: 'ACTIVE',
+        meteredMinutes: 0,
+        stripeCustomer: 'cus_tenant_b'
+      }
+    } as any);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/portal',
+      headers: {
+        'x-tenant-id': tenantA.id
+      },
+      payload: {
+        customerId: 'cus_tenant_b',
+        returnUrl: 'https://example.com'
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('processes Stripe subscription webhook events', async () => {
+    const { client } = context.prisma;
+    const subscription = await client.subscription.create({
+      data: {
+        tenantId: 'tenant_webhook',
+        tier: 'STARTER',
+        status: 'ACTIVE',
+        meteredMinutes: 0,
+        stripeCustomer: 'cus_webhook'
+      }
+    } as any);
+
+    const stripeEvent = {
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          customer: 'cus_webhook',
+          status: 'past_due',
+          id: 'sub_webhook'
+        }
+      }
+    } as Stripe.Event;
+
+    const stripeMock = {
+      webhooks: {
+        constructEvent: vi.fn().mockReturnValue(stripeEvent)
+      }
+    } as unknown as Stripe;
+
+    stripeLib.setStripeClientForTesting(stripeMock);
+    env.STRIPE_WEBHOOK_SECRET = 'whsec-test';
+
+    const rawBody = JSON.stringify({ payload: true });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      payload: rawBody,
+      headers: {
+        'stripe-signature': 'sig',
+        'content-type': 'application/json'
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(stripeMock.webhooks.constructEvent).toHaveBeenCalledWith(rawBody, 'sig', 'whsec-test');
+
+    const updated = await client.subscription.findUnique({ where: { id: subscription.id } });
+    expect(updated?.status).toBe('PAST_DUE');
+    expect(updated?.stripeSubId).toBe('sub_webhook');
   });
 });
