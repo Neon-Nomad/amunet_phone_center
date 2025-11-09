@@ -2,9 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { assertTenant } from '../lib/tenant';
+import { env } from '../config/env';
 import { BillingService } from '../services/billingService';
-
-const billingService = new BillingService();
 
 const checkoutSchema = z.object({
   tier: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
@@ -13,6 +12,7 @@ const checkoutSchema = z.object({
 });
 
 export default async function billingRoutes(app: FastifyInstance) {
+  const billingService = new BillingService(app.prisma);
   app.post('/checkout', async (request, reply) => {
     const tenant = assertTenant(request, reply);
     const body = checkoutSchema.parse(request.body);
@@ -31,6 +31,22 @@ export default async function billingRoutes(app: FastifyInstance) {
     const tenant = assertTenant(request, reply);
     const schema = z.object({ customerId: z.string(), returnUrl: z.string().url() });
     const body = schema.parse(request.body);
+    const subscription = await app.prisma.subscription.findFirst({
+      where: { tenantId: tenant.tenantId }
+    });
+
+    if (!subscription) {
+      return reply.status(404).send({ error: 'Subscription not found' });
+    }
+
+    if (env.STRIPE_SECRET_KEY) {
+      if (!subscription.stripeCustomer) {
+        return reply.status(403).send({ error: 'Stripe customer not linked for tenant' });
+      }
+      if (subscription.stripeCustomer !== body.customerId) {
+        return reply.status(403).send({ error: 'Customer ID mismatch for tenant' });
+      }
+    }
 
     const session = await billingService.createCustomerPortalSession(body.customerId, body.returnUrl);
 

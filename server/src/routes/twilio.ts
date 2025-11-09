@@ -1,19 +1,22 @@
+import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { assertTenant } from '../lib/tenant';
 import { verifyTwilioSignature } from '../lib/twilio';
 
-const twilioPayloadSchema = z.object({
-  CallSid: z.string().optional(),
-  From: z.string().optional(),
-  To: z.string().optional(),
+const twilioPayloadSchema = z
+  .object({
+    CallSid: z.string().optional(),
+    From: z.string().optional(),
+    To: z.string().optional(),
   CallStatus: z.string().optional(),
   RecordingUrl: z.string().optional(),
   CallDuration: z.union([z.string(), z.number()]).optional(),
   Body: z.string().optional(),
   Channel: z.string().optional(),
   MessageSid: z.string().optional()
-});
+  })
+  .passthrough();
 
 export default async function twilioRoutes(app: FastifyInstance) {
   app.post('/voice', async (request, reply) => {

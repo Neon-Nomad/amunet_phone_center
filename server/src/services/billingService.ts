@@ -1,14 +1,17 @@
 import Stripe from 'stripe';
+import { PrismaClient } from '@prisma/client';
 
 import { env } from '../config/env';
-
-const stripe = env.STRIPE_SECRET_KEY
-  ? new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: '2023-08-16' })
-  : null;
 
 export type BillingTier = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
 export class BillingService {
+  private readonly stripe: Stripe | null;
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.stripe = env.STRIPE_SECRET_KEY ? new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: '2023-08-16' }) : null;
+  }
+
   async createCheckoutSession({
     tier,
     tenantId,
@@ -20,7 +23,7 @@ export class BillingService {
     successUrl: string;
     cancelUrl: string;
   }) {
-    if (!stripe) {
+    if (!this.stripe) {
       return {
         url: `${successUrl}?tenantId=${tenantId}&tier=${tier}&mode=demo`
       };
@@ -31,9 +34,26 @@ export class BillingService {
       throw new Error(`Stripe price not configured for tier ${tier}`);
     }
 
-    const session = await stripe.checkout.sessions.create({
+    const subscription = await this.prisma.subscription.findFirst({ where: { tenantId } });
+    if (!subscription) {
+      throw new Error('Subscription not found');
+    }
+
+    let customerId = subscription.stripeCustomer;
+    if (!customerId) {
+      const customer = await this.stripe.customers.create({
+        metadata: { tenantId }
+      });
+      customerId = customer.id;
+      await this.prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { stripeCustomer: customerId }
+      });
+    }
+
+    const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
-      customer_email: undefined,
+      customer: customerId,
       metadata: { tenantId },
       success_url: successUrl,
       cancel_url: cancelUrl,
@@ -49,11 +69,11 @@ export class BillingService {
   }
 
   async createCustomerPortalSession(customerId: string, returnUrl: string) {
-    if (!stripe) {
+    if (!this.stripe) {
       return { url: `${returnUrl}?portal=disabled` };
     }
 
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await this.stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: returnUrl
     });

@@ -6,11 +6,23 @@ export interface TenantContext {
 
 export const tenantHeader = 'x-tenant-id';
 
+export class TenantMissingError extends Error {
+  statusCode = 400;
+
+  constructor() {
+    super('Missing tenant identifier header or query parameter');
+    this.name = 'TenantMissingError';
+  }
+}
+
 export function assertTenant(request: FastifyRequest, reply: FastifyReply): TenantContext {
-  const tenantId = request.headers[tenantHeader] as string | undefined;
+  const query = request.query as Record<string, string | undefined>;
+  const tenantIdHeader = request.headers[tenantHeader] as string | undefined;
+  const tenantIdQuery = query?.tenantId;
+  const tenantId = tenantIdHeader ?? tenantIdQuery;
+
   if (!tenantId) {
-    void reply.code(400);
-    throw new Error('Missing tenant identifier header');
+    throw new TenantMissingError();
   }
 
   return { tenantId };
