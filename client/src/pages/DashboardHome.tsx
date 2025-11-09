@@ -50,7 +50,7 @@ export default function DashboardHome() {
         setData({
           calls: [],
           bookings: [],
-          subscription: { tier: 'STARTER', status: 'ACTIVE' },
+          subscription: { tier: 'Starter', status: 'Active' },
           uptime: '99.9%'
         });
       }
@@ -74,7 +74,7 @@ export default function DashboardHome() {
     fetchStatus();
   }, [axios]);
 
-  const uptimeValue = statusInfo?.uptime ?? data?.uptime;
+  const uptimeValue = statusInfo?.uptime ?? data?.uptime ?? '—';
   const lastUpdated = statusInfo ? new Date(statusInfo.lastUpdate).toLocaleTimeString() : null;
   const planTier = data?.subscription?.tier ?? 'Starter';
   const planStatus = data?.subscription?.status ?? 'Active';
@@ -136,10 +136,10 @@ export default function DashboardHome() {
   };
 
   const highlightValue = (index: number) => {
-    if (!data) return '...';
+    if (!data) return '—';
     if (index === 0) return `${callCount}`;
     if (index === 1) return `${bookingCount}`;
-    return `${uptimeValue ?? '99.9%'} uptime`;
+    return `${uptimeValue} uptime`;
   };
 
   return (
@@ -151,8 +151,7 @@ export default function DashboardHome() {
             <div>
               <h1 className="text-4xl font-semibold text-slate-900">Free Trial to Paid Conversion</h1>
               <p className="text-sm text-slate-500">
-                This dashboard tracks new signups that convert to paying customers, and highlights the trends
-                that drive bookings.
+                Track new signups converting to paid customers and visualize the trends that feed bookings.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -188,15 +187,17 @@ export default function DashboardHome() {
                 </span>
                 <div>
                   <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Free trial to paid conversion trend</p>
-                  <p className="text-sm text-slate-400">Conversion trends | Last 90 days</p>
+                  <p className="text-sm text-slate-400">Conversion trends · Last 90 days</p>
                 </div>
               </div>
-              <span className="text-xs font-semibold text-slate-500">{lastUpdated ? `Updated ${lastUpdated}` : 'Updating...'}</span>
+              <span className="text-xs font-semibold text-slate-500">
+                {lastUpdated ? `Updated ${lastUpdated}` : 'Updating...'}
+              </span>
             </div>
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Total conversion rate</p>
-                <p className="text-2xl font-semibold text-slate-900">{uptimeValue ?? '99.9%'}</p>
+                <p className="text-2xl font-semibold text-slate-900">{uptimeValue}</p>
               </div>
               <div className={styles.trendChart}>
                 {uptimeTrend.map((value, index) => (
