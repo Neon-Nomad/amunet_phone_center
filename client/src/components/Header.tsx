@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 
 const navLinks = [
   { label: 'Platform', href: '#platform' },
@@ -26,9 +27,9 @@ export default function Header() {
           ))}
         </nav>
         <div className="hidden items-center gap-4 lg:flex">
-          <a href="/login" className="text-white/70 hover:text-white">
+          <Link to="/login" className="text-white/70 hover:text-white">
             Login
-          </a>
+          </Link>
           <a
             href="/dashboard"
             className="rounded-full bg-primary px-4 py-2 text-white shadow-lg shadow-primary/20 transition hover:-translate-y-0.5"
@@ -57,9 +58,9 @@ export default function Header() {
                 {link.label}
               </a>
             ))}
-            <a href="/login" className="text-white/70">
+            <Link to="/login" className="text-white/70">
               Login
-            </a>
+            </Link>
             <a href="/dashboard" className="rounded-full bg-primary px-4 py-2 text-center text-white">
               Launch Dashboard
             </a>

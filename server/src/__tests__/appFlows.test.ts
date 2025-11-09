@@ -32,6 +32,11 @@ describe('amunet platform flows', () => {
     env.STRIPE_STARTER_PRICE_ID = 'price_starter';
     env.STRIPE_PROFESSIONAL_PRICE_ID = 'price_professional';
     env.STRIPE_ENTERPRISE_PRICE_ID = 'price_enterprise';
+    env.SENDGRID_API_KEY = 'sendgrid-test';
+    env.SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/test/slack';
+    env.TWILIO_SUPPORT_NUMBER = '+18885551234';
+    env.SALES_EMAIL = 'sales@amunet.ai';
+    env.CALCOM_BOOKING_URL = 'https://cal.com/amunet/demo';
     env.CALCOM_API_KEY = undefined;
     axiosPost.mockReset();
     axiosPost.mockImplementation(async (url: string) => {
@@ -52,6 +57,15 @@ describe('amunet platform flows', () => {
           }
         };
       }
+
+      if (url.includes('hooks.slack.com')) {
+        return { status: 200, data: {} };
+      }
+
+      if (url.includes('sendgrid')) {
+        return { status: 202, data: {} };
+      }
+
       return { data: {} };
     });
 

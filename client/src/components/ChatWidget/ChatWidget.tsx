@@ -35,6 +35,7 @@ export default function ChatWidget() {
   const [latestActions, setLatestActions] = useState<ChatAction[]>([]);
   const [status, setStatus] = useState('I am listening.');
   const [isLoading, setIsLoading] = useState(false);
+  const [disabledActionKeys, setDisabledActionKeys] = useState<string[]>([]);
 
   const userType = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -55,7 +56,16 @@ export default function ChatWidget() {
     }
   }, []);
 
-  const handleAction = (action: ChatAction) => {
+  const makeActionKey = (action: ChatAction, index: number) => `${action.type}-${index}`;
+
+  const handleAction = (action: ChatAction, index: number) => {
+    const key = makeActionKey(action, index);
+    if (disabledActionKeys.includes(key)) {
+      return;
+    }
+
+    setDisabledActionKeys((prev) => [...prev, key]);
+
     if (action.type === 'book_demo' && action.payload?.url && typeof window !== 'undefined') {
       window.open(action.payload.url, '_blank');
       setStatus('Opening the demo booking page...');
@@ -83,6 +93,7 @@ export default function ChatWidget() {
     setInputValue('');
     setIsLoading(true);
     setStatus('Thinking...');
+    setDisabledActionKeys([]);
 
     try {
       const response = await queryChatbot({ message: trimmed, userType });
@@ -144,8 +155,9 @@ export default function ChatWidget() {
                 <button
                   key={`${action.type}-${index}`}
                   className="chat-widget__action-pill"
-                  onClick={() => handleAction(action)}
+                  onClick={() => handleAction(action, index)}
                   type="button"
+                  disabled={disabledActionKeys.includes(makeActionKey(action, index))}
                 >
                   {action.type.replace(/_/g, ' ')}
                 </button>
@@ -156,7 +168,9 @@ export default function ChatWidget() {
           <div className="chat-widget__input-row">
             <input
               className="chat-widget__input"
-              aria-label="Message" value={inputValue} onChange={(event) => setInputValue(event.target.value)}
+              aria-label="Message"
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
@@ -177,10 +191,13 @@ export default function ChatWidget() {
           </div>
         </div>
       )}
-      <button className="chat-widget__button" onClick={() => setIsOpen((prev) => !prev)} aria-label="Open chat">
+      <button
+        className="chat-widget__button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-label="Open chat"
+      >
         {isOpen ? '×' : '??'}
       </button>
     </div>
   );
 }
-

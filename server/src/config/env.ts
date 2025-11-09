@@ -19,10 +19,11 @@ const envSchema = z.object({
   STRIPE_STARTER_PRICE_ID: z.string().optional(),
   STRIPE_PROFESSIONAL_PRICE_ID: z.string().optional(),
   STRIPE_ENTERPRISE_PRICE_ID: z.string().optional(),
-  SENDGRID_API_KEY: z.string().optional(),
+  SENDGRID_API_KEY: z.string().min(1),
   RESEND_API_KEY: z.string().optional(),
-  SLACK_WEBHOOK_URL: z.string().optional(),
-  TWILIO_SUPPORT_NUMBER: z.string().optional()
+  SLACK_WEBHOOK_URL: z.string().min(1),
+  TWILIO_SUPPORT_NUMBER: z.string().min(1),
+  SALES_EMAIL: z.string().email()
 });
 
 const parsed = envSchema.safeParse(process.env);
