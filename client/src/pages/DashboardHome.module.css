@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Nunito+Sans:wght@400;600;700&display=swap');
+
+.dashboardPage {
+  font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif;
+  background-color: #0a0a0f;
+  color: #f4f4f5;
+  position: relative;
+  overflow: hidden;
+}
+
+.particleCanvas {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(157, 0, 255, 0.35), transparent 35%),
+    radial-gradient(circle at 80% 10%, rgba(0, 212, 255, 0.25), transparent 30%),
+    radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.06), transparent 40%);
+  opacity: 0.6;
+  mix-blend-mode: screen;
+  animation: floatParticles 24s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.animateFadeIn {
+  animation: fadeIn 0.9s ease both;
+}
+
+.animatePulseSlow {
+  animation: pulseSlow 3s ease-in-out infinite;
+}
+
+.sectionTitle {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.38em;
+  color: #9d00ff;
+}
+
+.headerAccent {
+  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: #8a7dfb;
+}
+
+.shimmerBlock {
+  display: inline-block;
+  height: 1rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.04));
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmerBlock::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.trendChart {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-end;
+  height: 90px;
+  margin-top: 1.5rem;
+}
+
+.trendBar {
+  flex: 1;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(157, 0, 255, 0.75), rgba(15, 23, 42, 0.85));
+  box-shadow: 0 0 18px rgba(157, 0, 255, 0.45);
+  position: relative;
+  overflow: hidden;
+}
+
+.trendBar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.08));
+  opacity: 0.9;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseSlow {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(110%);
+  }
+}
+
+@keyframes floatParticles {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(30px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
