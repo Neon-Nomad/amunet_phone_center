@@ -1,167 +1,96 @@
-Gemini Agent Workflow Policy: Client-Ready Autonomy
+# 🤖 AMUNET AI: Autonomous Workflow Policy (GEMINI.md)
 
-This document defines the non-negotiable standards, architectural constraints, and required features for all tasks delegated to the autonomous Gemini multi-agent system (Agent Mode) within this repository. The Agent must adhere to these rules before reporting task completion.
+This document contains the non-negotiable architectural, aesthetic, and functional constraints for all code modifications performed by the autonomous agent system. All tasks MUST adhere to these rules before reporting success.
 
-1. Core Mandate & Verification
+---
 
-1.1 Acceptance Criteria (Definition of "Working")
+## 1. CORE MANDATE & QUALITY GATE
 
-SUCCESS STATE: The agent must only report success if the final verification step (Section 4.1) is passed.
+| Constraint | Requirement |
+| :--- | :--- |
+| **1.1 Client-Ready Definition** | Code MUST be functional, secure, and ready for immediate deployment to a client-facing environment. |
+| **1.2 Project Type** | Single-file **React (JSX/TSX)** application using **Vite** and **Tailwind CSS**. |
+| **1.3 Quality Gate (Verification)** | **BEFORE** reporting success, the agent MUST execute the shell command: `npm run client-ready`. |
+| **1.4 Failure Policy** | If the `client-ready` command fails, the agent is authorized to make **ONE** subsequent attempt to fix the error (testing/linting/build issues) and re-run the verification command. If it fails again, the agent must **TERMINATE** and report the failure log. |
 
-CODE QUALITY: All generated or modified code must be clean, maintainable, and adhere to TypeScript/React best practices.
+---
 
-DO NOT COMMIT: The agent MUST NOT commit or push code that causes any build, test, or linting failure.
+## 2. BACKEND ARCHITECTURAL FIXES (High Priority)
 
-1.2 Fail-Safe Protocol
+The agent MUST complete the following tasks to secure and stabilize the backend:
 
-VALIDATION: The agent MUST execute the terminal command defined in Section 4.1 to verify its work.
+| Constraint | Requirement |
+| :--- | :--- |
+| **2.1 Authentication Fix** | Implement robust, production-ready **password hashing and storage logic** to replace the current `"pending-migration"` state in `server/src/routes/auth.ts`. |
+| **2.2 Error Handling** | Implement robust error handling for all external API calls, especially in `server/src/services/onboardingService.ts` (e.g., OpenAI API). |
+| **2.3 Token System** | The frontend must use the **JWT-based token system** implied by the backend architecture for all authenticated API calls. |
 
-RECOVERY: If the validation command fails, the agent is authorized to make ONE subsequent attempt to fix the error and re-run the verification command.
+---
 
-TERMINATION: If the error persists after the fix attempt, the agent must TERMINATE and report the specific test failure or error log to the human user.
+## 3. CLIENT ARCHITECTURAL REWRITE (Highest Priority)
 
-2. Authentication & Data Handling
+The agent MUST refactor the entire client application to support a multi-page experience.
 
-2.1 Backend Requirements
+### 3.1 Structural Layout (7 Mandatory Routes)
 
-SECURE LOGIN: Implement robust, production-ready user registration and login endpoints in server/src/routes/auth.ts.
+The application MUST use **Internal State-Based Navigation** (conditional rendering via React state/hooks) to support the following **seven distinct, mandatory pages/views**.
 
-PASSWORD HASHING: Finalize the secure password hashing and storage logic to replace any "pending-migration" state.
+| Route Key | Purpose | Auth Required |
+| :--- | :--- | :--- |
+| **1.** `/` | **Home / Landing Page** (Introductory marketing, services overview, Call-to-Action) | No |
+| **2.** `/auth` | **Authentication View** (Unified **Sign In** and **Sign Up** forms that rotate/switch on interaction) | No |
+| **3.** `/approach` | **About Us / Approach** (Explains the methodology, expertise, and company mission to build trust) | No |
+| **4.** `/docs` | **Documentation / Guide** (Client-facing reference for using the Amunet AI platform) | Yes |
+| **5.** `/dashboard` | **Client Dashboard** (Primary authenticated view for metrics and usage) | Yes |
+| **6.** `/contact` | **Contact / Support** (Form and contact details for human support) | No |
+| **7.** `/admin` | **NEW ADMIN PLACEHOLDER** (A highly restricted page—initial implementation can be a simple placeholder message/component). | Yes (Admin Role) |
 
-ERROR HANDLING: Implement robust error handling around all external API calls (e.g., OpenAI integration in server/src/services/onboardingService.ts), including proper logging and client-facing error messages.
+### 3.2 Aesthetic & Components
 
-TOKEN SYSTEM: The backend must use the established JWT-based token system for all authenticated API requests.
+| Element | Requirement |
+| :--- | :--- |
+| **Preloader** | MUST implement a full-page preloader using **Three.js** (loaded via CDN). The visual must be a **telephone ringing/shaking** without sound. |
+| **Navigation** | MUST feature a fixed top navigation bar that includes a **Full-Page Hamburger Menu** for mobile and a persistent **Light/Dark Mode toggle**. |
+| **Layout Modeling** | The general flow, sectioning, and professional spacing should be modeled after the structure of the reference site (`https://we-enable.nl/`). |
 
-2.2 Client-Side Data Flow
+---
 
-The frontend must securely store and use the authentication token for all API calls to retrieve dynamic content for the Dashboard and other authenticated views.
+## 4. DESIGN & THEME
 
-All dashboard data fetching must be wired up and functional.
+### 4.1 Color Palette
 
-3. Design and Aesthetics Constraints
+The entire application MUST utilize the following high-contrast color palette:
 
-3.1 Structural Layout (Based on we-enable.nl)
+| Element | Light Mode Color | Dark Mode Color | Tailwind Class Suggestion |
+| :--- | :--- | :--- | :--- |
+| **Primary Accent** | `#7D3C98` (Deep Purple) | `#9B59B6` (Brighter Purple) | `text-purple-600 / bg-purple-600` |
+| **Secondary Accent** | `#FFC300` (Rich Gold) | `#FFD700` (Brighter Gold) | `text-yellow-500 / bg-yellow-500` |
+| **Background (Neutral)** | `#F0F0F0` (Off-White/Light Gray) | `#1F2937` (Dark Slate Gray) | `bg-gray-100 / bg-gray-800` |
+| **Text (Body)** | `#1F2937` (Dark Slate Gray) | `#F0F0F0` (Off-White/Light Gray) | `text-gray-800 / text-gray-100` |
 
-Layout Model: The overall layout and professional, segmented structure must be modeled after the site https://we-enable.nl/.
+### 4.2 Dark Mode Implementation
 
-Primary Navigation: A persistent top-level navigation bar must be present.
+The application MUST be fully functional in both light and dark mode, toggled via a dedicated button in the navigation. The color palette defined in 4.1 MUST be used exclusively for both themes.
 
-Full-Page Menu: A full-page, animated Hamburger Menu must be implemented for mobile and tablet views.
+---
 
-Multi-Page Architecture (MANDATORY): The application must use Internal State-Based Navigation (conditional rendering via switch or state management) to simulate separate pages. The following minimum routes are required:
+## 5. DASHBOARD FUNCTIONALITY (`/dashboard`)
 
-/ (Home/Landing Page)
+The Client Dashboard MUST be fully wired up with functional components and mock data placeholders for the following **client-critical metrics**.
 
-/expertise
+### 5.1 User & Account Information
 
-/approach
+| Metric | Requirement |
+| :--- | :--- |
+| **User Account Details** | Display client's **Account ID/Number**. |
+| **Membership Status** | Display the client's current **Subscription Tier** (e.g., "Pro Member"). |
+| **Amunet Telephone Number** | Display the client's assigned **Amunet AI phone number** prominently. |
 
-/docs
+### 5.2 AI Performance Metrics & Artifact Management
 
-/contact
-
-3.2 Color Palette & Mode Switching
-
-Element
-
-Light Mode Color
-
-Dark Mode Color
-
-HEX Code
-
-Primary Accent (Buttons, Highlights)
-
-Deep Royal Purple
-
-Deep Royal Purple
-
-#7D3C98
-
-Secondary Accent (Hover, Data Bars)
-
-Rich Goldenrod/Gold
-
-Rich Goldenrod/Gold
-
-#FFC300
-
-Background (Neutral)
-
-Off-White/Light Gray
-
-Dark Charcoal Gray
-
-#F0F0F0 / #1A1A1A
-
-Text/Foreground
-
-Dark Gray
-
-Off-White
-
-#333333 / #F0F0F0
-
-3.3 Dark Mode Toggle (MANDATORY)
-
-The primary navigation bar must include a functional Light/Dark Mode toggle/switch.
-
-The application must persist the user's preferred mode (e.g., using local storage).
-
-All components, including the Dashboard and Preloader, must respect and dynamically switch between these defined palettes.
-
-3.4 Preloader Requirement (Three.js)
-
-The application must display a Preloader while assets are loading.
-
-The preloader animation MUST be implemented using Three.js for a futuristic look.
-
-Animation: The animation should feature a telephone object ringing/shaking, simulating a phone receiving a call, but MUST NOT include any audio.
-
-4. Feature Implementation Requirements
-
-4.1 Automated Verification Script
-
-The agent MUST ensure the following script exists in package.json and uses this as the success gate for all work:
-
-# Script must run ALL required checks
-"client-ready": "npm run build && npm test && npm run lint"
-
-
-4.2 Documentation Section (The "Docs Agent")
-
-A dedicated Documentation view (/docs) must be created. This section must explain the following:
-
-How to use the Amunet AI receptionist service.
-
-The rules and logic the AI follows.
-
-How to utilize the features within the client portal (e.g., how to retrieve documents).
-
-4.3 The Dashboard (Authenticated View)
-
-The authenticated Dashboard (/dashboard) must be functional, aesthetically futuristic, and display the following critical, wired-up metrics and user details:
-
-4.3.1 User Account Status
-
-User Account Details: Display the client's unique Account ID/Number.
-
-Membership Status: Display the client's current subscription tier (e.g., "Pro Member," "Basic").
-
-Amunet Telephone Number: Display the client's assigned, operational Amunet telephone number.
-
-4.3.2 AI Performance Metrics & Artifact Management
-
-Total Calls: Display the Total Call Count handled by the AI for the current billing period.
-
-Avg. Call Length: Display the Average Call Length handled by the AI (e.g., 2:35 minutes).
-
-AI Artifact Retrieval (MANDATORY): A functional area where the user can press a button or link to retrieve documents and artifacts created by the AI (e.g., call summaries, generated reports). This must fetch data from the backend API.
-
-4.3.3 Billing & Usage
-
-Token/Usage Meter: Display the client's current token consumption (or remaining quota) for the billing cycle.
-
-Subscription Tier: Display the current subscription level (e.g., "Standard," "Enterprise").
-
-Billing Summary: Display the current month-to-date charges or usage against their base rate.
+| Metric | Requirement |
+| :--- | :--- |
+| **Total Calls** | Display the **Total Call Volume** processed by the AI in the last 30 days. |
+| **Call Length** | Display the **Average Call Length** in minutes/seconds. |
+| **Call Outcomes** | Display a summary of call outcomes (e.g., **% Resolved**, **% Transferred to Human**). |
+| **Artifact Retrieval** | Implement a functional component allowing the user to press a button/link to **retrieve and download documents** (e.g., call summaries, generated reports) created by the AI. |
