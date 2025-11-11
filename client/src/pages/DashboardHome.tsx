@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { CalendarDaysIcon, ChartBarIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import api from '../lib/api';
 
 import styles from './DashboardHome.module.css';
 
 interface DashboardContext {
   tenant: { tenantId: string } | null;
-  axios: typeof import('axios');
+  api: typeof api;
 }
 
 interface OverviewResponse {
@@ -35,7 +36,7 @@ const renderPlaceholder = (width = 80, height = 18) => (
 );
 
 export default function DashboardHome() {
-  const { tenant, axios } = useOutletContext<DashboardContext>();
+  const { tenant, api: apiInstance } = useOutletContext<DashboardContext>();
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [statusInfo, setStatusInfo] = useState<StatusResponse | null>(null);
 
@@ -49,9 +50,8 @@ export default function DashboardHome() {
 
     const fetchData = async () => {
       try {
-        const response = await axios.get<OverviewResponse>('/api/dashboard/overview', {
-          headers: { 'x-tenant-id': tenant?.tenantId ?? 'demo-tenant' }
-        });
+        // JWT token is automatically added by api interceptor
+        const response = await apiInstance.get<OverviewResponse>('/api/dashboard/overview');
         setData(sanitizeOverview(response.data));
       } catch {
         setData(sanitizeOverview(null));
@@ -59,14 +59,13 @@ export default function DashboardHome() {
     };
 
     fetchData();
-  }, [axios, tenant?.tenantId]);
+  }, [apiInstance, tenant?.tenantId]);
 
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const response = await axios.get<StatusResponse>('/api/status', {
-          headers: { 'x-tenant-id': tenant?.tenantId ?? 'demo-tenant' }
-        });
+        // JWT token is automatically added by api interceptor
+        const response = await apiInstance.get<StatusResponse>('/api/status');
         setStatusInfo(response.data);
       } catch (error) {
         console.error(error);
@@ -74,7 +73,7 @@ export default function DashboardHome() {
     };
 
     fetchStatus();
-  }, [axios]);
+  }, [apiInstance]);
 
   const uptimeValue = statusInfo?.uptime ?? data?.uptime ?? '—';
   const lastUpdated = statusInfo ? new Date(statusInfo.lastUpdate).toLocaleTimeString() : null;
