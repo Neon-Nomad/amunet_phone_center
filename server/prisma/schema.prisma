@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id             String           @id @default(cuid())
+  name           String
+  primaryDomain  String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  users          User[]
+  subscriptions  Subscription[]
+  configs        BusinessConfig[]
+  calls          Call[]
+  messages       Message[]
+  bookings       Booking[]
+  logs           AuditLog[]
+}
+
+model User {
+  id              String   @id @default(cuid())
+  tenantId        String
+  email           String   @unique
+  passwordHash    String
+  role            String   @default("admin")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Subscription {
+  id             String   @id @default(cuid())
+  tenantId       String
+  stripeCustomer String?
+  stripeSubId    String?
+  tier           SubscriptionTier
+  status         SubscriptionStatus @default(ACTIVE)
+  seats          Int      @default(1)
+  meteredMinutes Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+enum SubscriptionTier {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model BusinessConfig {
+  id                String   @id @default(cuid())
+  tenantId          String
+  businessName      String
+  websiteUrl        String?
+  industry          String?
+  timezone          String?
+  voiceProfile      String
+  aiProvider        String
+  calendarLink      String?
+  callRoutingConfig Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Call {
+  id             String   @id @default(cuid())
+  tenantId       String
+  fromNumber     String
+  toNumber       String
+  status         String
+  duration       Int      @default(0)
+  transcript     String?
+  providerSid    String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  tenantId  String
+  direction String
+  content   String
+  channel   String
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Booking {
+  id           String   @id @default(cuid())
+  tenantId     String
+  customerName String
+  customerEmail String?
+  scheduledFor DateTime
+  notes        String?
+  createdAt    DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  category  String
+  message   String
+  createdAt DateTime @default(now())
+  metadata  Json?
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+}

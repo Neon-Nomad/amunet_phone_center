@@ -1,4 +1,8 @@
 {
+<<<<<<< HEAD
     "explorer.compactFolders": false,
     "CodeGPT.apiKey": "Ollama"
+=======
+    "CodeGPT.apiKey": "Google AI Studio"
+>>>>>>> 6c2e03e1255089315b8a8a9fe205bda82a7e0f67
 }
