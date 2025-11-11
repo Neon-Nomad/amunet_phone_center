@@ -73,7 +73,7 @@ export default function DashboardLayout() {
         </div>
       </div>
       <div className="mx-auto max-w-6xl px-6 py-10">
-        <Outlet context={{ tenant, setTenant, axios }} />
+        <Outlet context={{ tenant, setTenant }} />
       </div>
     </div>
   );
