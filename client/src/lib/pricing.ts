@@ -1,27 +1,57 @@
 export interface PricingTier {
-  name: 'Starter' | 'Professional' | 'Enterprise';
+  name: 'Starter' | 'Growth' | 'Enterprise';
   price: string;
-  description: string;
+  tagline: string;
+  audience: string;
   features: string[];
+  cta: string;
 }
 
 export const pricingTiers: PricingTier[] = [
   {
     name: 'Starter',
-    price: '$197/mo',
-    description: 'Solo founders getting their first AI receptionist online.',
-    features: ['1 phone number', 'Standard voices', 'Up to 500 call minutes', 'Calendar sync']
+    price: '$497/mo',
+    tagline: 'Best for solo professionals',
+    audience: 'Single-location dentists, electricians, or HVAC techs starting automation.',
+    features: [
+      '1 phone number',
+      'Up to 1,000 call minutes',
+      'Standard voices',
+      'SMS + email notifications',
+      'Calendar sync',
+      '14-day free trial'
+    ],
+    cta: 'Start Free Trial'
   },
   {
-    name: 'Professional',
-    price: '$497/mo',
-    description: 'Growing teams automating intake, triage, and scheduling.',
-    features: ['3 phone numbers', 'Premium voices', 'Unlimited chat widget', 'Advanced routing']
+    name: 'Growth',
+    price: '$997/mo',
+    tagline: 'Scale your scheduling power',
+    audience: 'Multi-staff offices or crews ready to replace missed calls.',
+    features: [
+      '3 phone numbers',
+      'Up to 3,000 call minutes',
+      'Premium ElevenLabs voices',
+      'Advanced call routing',
+      'Missed-call ? SMS recovery',
+      'Team analytics dashboard',
+      '14-day free trial'
+    ],
+    cta: 'Start Free Trial'
   },
   {
     name: 'Enterprise',
-    price: 'Talk to sales',
-    description: 'Scaled operations with compliance, analytics, and custom SLAs.',
-    features: ['Dedicated success manager', 'ElevenLabs premium voices', 'SOC2-ready logging', 'Custom integrations']
+    price: 'Custom pricing',
+    tagline: 'Built for complex operations',
+    audience: 'Franchises or multi-location businesses needing compliance and integrations.',
+    features: [
+      'Unlimited phone numbers',
+      'Usage-based minutes',
+      'SOC2-ready logging',
+      'Dedicated success manager',
+      'Custom integrations (CRM, Slack, Zapier)',
+      '14-day proof-of-concept trial'
+    ],
+    cta: 'Talk to Sales'
   }
 ];

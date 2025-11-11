@@ -5,10 +5,11 @@ import PlatformShowcase from './sections/PlatformShowcase';
 import Pricing from './sections/Pricing';
 import OnboardingTimeline from './sections/OnboardingTimeline';
 import Testimonials from './sections/Testimonials';
+import ChatWidget from './components/ChatWidget/ChatWidget';
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-dark text-white">
+    <div className="min-h-screen bg-[#f7f7fb] text-slate-900">
       <Header />
       <main>
         <Hero />
@@ -18,6 +19,7 @@ export default function App() {
         <Testimonials />
       </main>
       <Footer />
+      <ChatWidget />
     </div>
   );
 }

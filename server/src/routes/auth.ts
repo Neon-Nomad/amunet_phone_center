@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { hash, compare } from 'bcryptjs';
 import { z } from 'zod';
 
-import { tenantHeader } from '../lib/tenant';
+import { requireAuth } from '../lib/auth';
 
 const registrationSchema = z.object({
   email: z.string().email(),
@@ -28,7 +28,7 @@ export default async function authRoutes(app: FastifyInstance) {
       data: { name: body.tenantName }
     });
 
-    const passwordHash = await hash(body.password, 10);
+    const passwordHash = await hash(body.password, 12);
 
     const user = await app.prisma.user.create({
       data: {
@@ -65,10 +65,28 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: 'Invalid credentials' });
     }
 
+    // Generate JWT token with user and tenant information
+    const token = app.jwt.sign(
+      {
+        userId: user.id,
+        tenantId: user.tenantId,
+        email: user.email
+      },
+      {
+        expiresIn: '7d' // Token expires in 7 days
+      }
+    );
+
     return reply.send({
-      token: `stub-token-${user.id}`,
-      tenantId: user.tenantId,
-      headers: { [tenantHeader]: user.tenantId }
+      token,
+      tenantId: user.tenantId
     });
+  });
+
+  app.post('/logout', { preHandler: requireAuth }, async (request, reply) => {
+    // Logout is handled client-side by removing the token
+    // This endpoint can be used for server-side token invalidation in the future
+    // For now, we just return success
+    return reply.send({ message: 'Logged out successfully' });
   });
 }

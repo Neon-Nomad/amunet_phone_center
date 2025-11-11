@@ -117,5 +117,6 @@ model AuditLog {
   category  String
   message   String
   createdAt DateTime @default(now())
+  metadata  Json?
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
 }
