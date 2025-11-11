@@ -26,17 +26,23 @@ export default function Header() {
             </a>
           ))}
         </nav>
-        <div className="hidden items-center gap-4 lg:flex">
-          <Link to="/login" className="text-slate-500 hover:text-slate-900">
-            Login
-          </Link>
-          <a
-            href="/dashboard"
-            className="rounded-full bg-[#6c4bff] px-4 py-2 text-white shadow-lg shadow-[#6c4bff]/20 transition hover:-translate-y-0.5"
-          >
-            Launch Dashboard
-          </a>
-        </div>
+          <div className="hidden items-center gap-4 lg:flex">
+            <Link to="/login" className="text-slate-500 hover:text-slate-900">
+              Login
+            </Link>
+            <Link
+              to="/signup"
+              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400"
+            >
+              Sign up
+            </Link>
+            <Link
+              to="/dashboard"
+              className="rounded-full bg-[#6c4bff] px-4 py-2 text-white shadow-lg shadow-[#6c4bff]/20 transition hover:-translate-y-0.5"
+            >
+              Launch Dashboard
+            </Link>
+          </div>
         <button
           className="inline-flex items-center rounded-full border border-slate-200 bg-white p-2 text-slate-600 lg:hidden"
           onClick={() => setOpen((value) => !value)}
@@ -61,12 +67,18 @@ export default function Header() {
             <Link to="/login" className="text-slate-600">
               Login
             </Link>
-            <a
-              href="/dashboard"
+            <Link
+              to="/signup"
+              className="rounded-full border border-slate-200 px-4 py-2 text-center text-slate-600 shadow-sm shadow-slate-200"
+            >
+              Sign up
+            </Link>
+            <Link
+              to="/dashboard"
               className="rounded-full bg-[#6c4bff] px-4 py-2 text-center text-white shadow-lg shadow-[#6c4bff]/20"
             >
               Launch Dashboard
-            </a>
+            </Link>
           </motion.nav>
         ) : null}
       </AnimatePresence>

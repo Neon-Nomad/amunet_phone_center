@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
 interface TenantInfo {
@@ -34,12 +34,12 @@ export default function DashboardLayout() {
             <p className="text-xs text-slate-500">Tenant: {tenant?.tenantId ?? 'demo-tenant'}</p>
           </div>
           <nav className="flex gap-3">
-            <a className={linkClass('/dashboard')} href="/dashboard">
+            <Link className={linkClass('/dashboard')} to="/dashboard">
               Overview
-            </a>
-            <a className={linkClass('/settings')} href="/settings">
+            </Link>
+            <Link className={linkClass('/dashboard/settings')} to="/dashboard/settings">
               Settings
-            </a>
+            </Link>
           </nav>
         </div>
       </div>

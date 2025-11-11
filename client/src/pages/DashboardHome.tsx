@@ -40,19 +40,21 @@ export default function DashboardHome() {
   const [statusInfo, setStatusInfo] = useState<StatusResponse | null>(null);
 
   useEffect(() => {
+    const sanitizeOverview = (payload: Partial<OverviewResponse> | null): OverviewResponse => ({
+      calls: payload?.calls ?? [],
+      bookings: payload?.bookings ?? [],
+      subscription: payload?.subscription ?? { tier: 'Starter', status: 'Active' },
+      uptime: payload?.uptime ?? '99.9%'
+    });
+
     const fetchData = async () => {
       try {
         const response = await axios.get<OverviewResponse>('/api/dashboard/overview', {
           headers: { 'x-tenant-id': tenant?.tenantId ?? 'demo-tenant' }
         });
-        setData(response.data);
+        setData(sanitizeOverview(response.data));
       } catch {
-        setData({
-          calls: [],
-          bookings: [],
-          subscription: { tier: 'Starter', status: 'Active' },
-          uptime: '99.9%'
-        });
+        setData(sanitizeOverview(null));
       }
     };
 
@@ -78,12 +80,12 @@ export default function DashboardHome() {
   const lastUpdated = statusInfo ? new Date(statusInfo.lastUpdate).toLocaleTimeString() : null;
   const planTier = data?.subscription?.tier ?? 'Starter';
   const planStatus = data?.subscription?.status ?? 'Active';
-  const callCount = data?.calls.length ?? 0;
-  const bookingCount = data?.bookings.length ?? 0;
+  const callCount = data?.calls?.length ?? 0;
+  const bookingCount = data?.bookings?.length ?? 0;
   const maxTrend = useMemo(() => Math.max(...uptimeTrend), []);
 
   const renderCalls = () => {
-    if (!data) {
+    if (!data?.calls) {
       return Array.from({ length: 3 }).map((_, index) => (
         <div key={index} className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0">
           {renderPlaceholder(140, 16)}
@@ -111,7 +113,7 @@ export default function DashboardHome() {
   };
 
   const renderBookings = () => {
-    if (!data) {
+    if (!data?.bookings) {
       return Array.from({ length: 3 }).map((_, index) => (
         <div key={index} className="flex items-center justify-between border-b border-slate-100/60 py-3 last:border-b-0">
           {renderPlaceholder(120, 16)}

@@ -28,7 +28,7 @@ export default async function authRoutes(app: FastifyInstance) {
       data: { name: body.tenantName }
     });
 
-    const passwordHash = await hash(body.password, 10);
+    const passwordHash = await hash(body.password, 12);
 
     const user = await app.prisma.user.create({
       data: {

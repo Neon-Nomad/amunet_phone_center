@@ -1,5 +1,6 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useRef } from 'react';
+import { Link } from 'react-router-dom';
 
 export default function Hero() {
   const ref = useRef<HTMLDivElement>(null);
@@ -25,11 +26,14 @@ export default function Hero() {
             in a single flow. No engineers required.
           </p>
           <div className="flex flex-wrap gap-4">
-            <a
-              href="#pricing"
+            <Link
+              to="/signup"
               className="rounded-full bg-[#6c4bff] px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-[#6c4bff]/30"
             >
-              Explore Pricing
+              Start free trial
+            </Link>
+            <a href="#pricing" className="rounded-full border border-slate-200 px-6 py-3 text-sm text-slate-500">
+              Explore pricing
             </a>
             <a href="#how-it-works" className="rounded-full border border-slate-200 px-6 py-3 text-sm text-slate-500">
               See the 6-step onboarding
