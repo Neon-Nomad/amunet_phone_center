@@ -1,14 +1,14 @@
 import { FastifyInstance } from 'fastify';
 
-import { assertTenant } from '../lib/tenant';
+import { requireAuth, getAuthUser } from '../lib/auth';
 
 export default async function statusRoutes(app: FastifyInstance) {
-  app.get('/status', async (request, reply) => {
-    const tenant = assertTenant(request, reply);
+  app.get('/status', { preHandler: requireAuth }, async (request, reply) => {
+    const user = getAuthUser(request);
     const windowStart = new Date(Date.now() - 5 * 60 * 1000);
 
     const calls = await app.prisma.call.findMany({
-      where: { tenantId: tenant.tenantId }
+      where: { tenantId: user.tenantId }
     });
 
     const activeCalls = calls.filter((call) => call.createdAt >= windowStart).length;

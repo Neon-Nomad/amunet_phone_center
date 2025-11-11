@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import Stripe from 'stripe';
 
-import { assertTenant } from '../lib/tenant';
+import { requireAuth, getAuthUser } from '../lib/auth';
 import { env } from '../config/env';
 import { getStripeClient } from '../lib/stripe';
 import { metrics } from '../lib/metrics';
@@ -18,8 +18,8 @@ const checkoutSchema = z.object({
 export default async function billingRoutes(app: FastifyInstance) {
   const billingService = new BillingService(app.prisma);
 
-  app.post('/checkout', async (request, reply) => {
-    const tenant = assertTenant(request, reply);
+  app.post('/checkout', { preHandler: requireAuth }, async (request, reply) => {
+    const user = getAuthUser(request);
     let body;
     try {
       body = checkoutSchema.parse(request.body);
@@ -35,7 +35,7 @@ export default async function billingRoutes(app: FastifyInstance) {
 
     const session = await billingService.createCheckoutSession({
       tier: body.tier,
-      tenantId: tenant.tenantId,
+      tenantId: user.tenantId,
       successUrl: body.successUrl,
       cancelUrl: body.cancelUrl,
       customerEmail: body.customerEmail
@@ -44,12 +44,12 @@ export default async function billingRoutes(app: FastifyInstance) {
     return reply.send(session);
   });
 
-  app.post('/portal', async (request, reply) => {
-    const tenant = assertTenant(request, reply);
+  app.post('/portal', { preHandler: requireAuth }, async (request, reply) => {
+    const user = getAuthUser(request);
     const schema = z.object({ customerId: z.string(), returnUrl: z.string().url() });
     const body = schema.parse(request.body);
     const subscription = await app.prisma.subscription.findFirst({
-      where: { tenantId: tenant.tenantId }
+      where: { tenantId: user.tenantId }
     });
 
     if (!subscription) {
@@ -67,7 +67,7 @@ export default async function billingRoutes(app: FastifyInstance) {
 
     await app.prisma.auditLog.create({
       data: {
-        tenantId: tenant.tenantId,
+        tenantId: user.tenantId,
         category: 'billing',
         message: `Generated billing portal session for customer ${body.customerId}`
       }
@@ -81,6 +81,7 @@ export default async function billingRoutes(app: FastifyInstance) {
     {
       config: {
         rawBody: true,
+        bodyLimit: 1_000_000,
         rateLimit: {
           max: 100,
           timeWindow: '1 minute'

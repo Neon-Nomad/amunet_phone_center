@@ -1,15 +1,19 @@
-import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import type { LoginResponse, ApiError } from '../lib/types';
+import type { LoginResponse, RegisterResponse, ApiError } from '../lib/types';
 import { AxiosError } from 'axios';
 
-export default function LoginPage() {
+export default function SignupPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [status, setStatus] = useState<'idle' | 'pending' | 'error'>('idle');
+  const [form, setForm] = useState({ email: '', password: '', tenantName: '' });
+  const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
+
+  const handleChange = (field: keyof typeof form) => (event: ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -18,22 +22,30 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      const response = await api.post<LoginResponse>('/api/auth/login', {
+      // Register new user
+      await api.post<RegisterResponse>('/api/auth/register', {
+        email: form.email,
+        password: form.password,
+        tenantName: form.tenantName
+      });
+
+      // Auto-login after successful registration
+      const loginResponse = await api.post<LoginResponse>('/api/auth/login', {
         email: form.email,
         password: form.password
       });
 
-      const { token, tenantId } = response.data;
+      const { token, tenantId } = loginResponse.data;
       
       if (!token || !tenantId) {
-        throw new Error('Invalid response from server.');
+        throw new Error('Missing authentication data');
       }
 
       // Store token and tenant information
       localStorage.setItem('token', token);
       localStorage.setItem('amunet-tenant', JSON.stringify({ tenantId }));
       
-      setStatus('idle');
+      setStatus('success');
       navigate('/dashboard');
     } catch (error) {
       setStatus('error');
@@ -41,27 +53,37 @@ export default function LoginPage() {
       const errorMessage = axiosError.response?.data?.error 
         ?? axiosError.response?.data?.message 
         ?? axiosError.message 
-        ?? 'Failed to sign in.';
+        ?? 'Unable to create an account.';
       setMessage(errorMessage);
     }
   };
 
-  const handleChange = (field: keyof typeof form) => (event: ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
-  };
-
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#030712] px-6 text-white">
-      <div className="w-full max-w-md space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-indigo-900/40 backdrop-blur">
-        <h1 className="text-3xl font-bold">Login</h1>
-        <p className="text-sm text-white/70">Secure access for tenants and admins.</p>
+    <div className="flex min-h-screen items-center justify-center bg-[#030712] px-6 text-white">
+      <div className="w-full max-w-md space-y-8 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-indigo-900/40 backdrop-blur">
+        <h1 className="text-3xl font-bold">Auto-Onboard My Business</h1>
+        <p className="text-sm text-white/70">Create an account and launch your AI receptionist in minutes.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="login-email" className="text-xs uppercase tracking-[0.4em] text-white/50">
+            <label htmlFor="tenantName" className="text-xs uppercase tracking-[0.4em] text-white/50">
+              Business name
+            </label>
+            <input
+              id="tenantName"
+              value={form.tenantName}
+              onChange={handleChange('tenantName')}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white"
+              placeholder="My Business, LLC"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="email" className="text-xs uppercase tracking-[0.4em] text-white/50">
               Email
             </label>
             <input
-              id="login-email"
+              id="email"
+              type="email"
               value={form.email}
               onChange={handleChange('email')}
               className="mt-2 w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white"
@@ -70,18 +92,18 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label htmlFor="login-password" className="text-xs uppercase tracking-[0.4em] text-white/50">
+            <label htmlFor="password" className="text-xs uppercase tracking-[0.4em] text-white/50">
               Password
             </label>
             <input
-              id="login-password"
+              id="password"
               type="password"
               value={form.password}
               onChange={handleChange('password')}
               className="mt-2 w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm text-white"
               placeholder="Strong password"
-              required
               minLength={8}
+              required
             />
           </div>
           <button
@@ -89,14 +111,14 @@ export default function LoginPage() {
             disabled={status === 'pending'}
             className="w-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {status === 'pending' ? 'Signing in...' : 'Request access'}
+            {status === 'pending' ? 'Setting up your AI...' : 'Start free trial'}
           </button>
-        </form>
           {message && (
             <p className={`text-xs ${status === 'error' ? 'text-red-400' : 'text-emerald-300'}`}>
               {message}
             </p>
           )}
+        </form>
       </div>
     </div>
   );

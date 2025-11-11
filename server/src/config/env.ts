@@ -23,7 +23,8 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   SLACK_WEBHOOK_URL: z.string().min(1),
   TWILIO_SUPPORT_NUMBER: z.string().min(1),
-  SALES_EMAIL: z.string().email()
+  SALES_EMAIL: z.string().email(),
+  JWT_SECRET: z.string().min(32).default('change-me-in-production-min-32-chars-long-secret-key')
 });
 
 const parsed = envSchema.safeParse(process.env);

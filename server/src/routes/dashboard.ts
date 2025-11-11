@@ -1,23 +1,23 @@
 import { FastifyInstance } from 'fastify';
 
-import { assertTenant } from '../lib/tenant';
+import { requireAuth, getAuthUser } from '../lib/auth';
 
 export default async function dashboardRoutes(app: FastifyInstance) {
-  app.get('/overview', async (request, reply) => {
-    const tenant = assertTenant(request, reply);
+  app.get('/overview', { preHandler: requireAuth }, async (request, reply) => {
+    const user = getAuthUser(request);
 
     const [calls, bookings, subscription] = await Promise.all([
       app.prisma.call.findMany({
-        where: { tenantId: tenant.tenantId },
+        where: { tenantId: user.tenantId },
         orderBy: { createdAt: 'desc' },
         take: 5
       }),
       app.prisma.booking.findMany({
-        where: { tenantId: tenant.tenantId },
+        where: { tenantId: user.tenantId },
         orderBy: { scheduledFor: 'desc' },
         take: 5
       }),
-      app.prisma.subscription.findFirst({ where: { tenantId: tenant.tenantId } })
+      app.prisma.subscription.findFirst({ where: { tenantId: user.tenantId } })
     ]);
 
     return reply.send({

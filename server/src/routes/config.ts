@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { assertTenant } from '../lib/tenant';
+import { requireAuth, getAuthUser } from '../lib/auth';
 import { allowPremiumVoices } from '../services/voiceService';
 
 const updateSchema = z.object({
@@ -11,17 +11,17 @@ const updateSchema = z.object({
 });
 
 export default async function configRoutes(app: FastifyInstance) {
-  app.get('/', async (request, reply) => {
-    const tenant = assertTenant(request, reply);
-    const config = await app.prisma.businessConfig.findFirst({ where: { tenantId: tenant.tenantId } });
+  app.get('/', { preHandler: requireAuth }, async (request, reply) => {
+    const user = getAuthUser(request);
+    const config = await app.prisma.businessConfig.findFirst({ where: { tenantId: user.tenantId } });
     return reply.send(config);
   });
 
-  app.put('/', async (request, reply) => {
-    const tenant = assertTenant(request, reply);
+  app.put('/', { preHandler: requireAuth }, async (request, reply) => {
+    const user = getAuthUser(request);
     const body = updateSchema.parse(request.body);
 
-    const subscription = await app.prisma.subscription.findFirst({ where: { tenantId: tenant.tenantId } });
+    const subscription = await app.prisma.subscription.findFirst({ where: { tenantId: user.tenantId } });
     if (!subscription) {
       return reply.status(400).send({ error: 'Subscription not found' });
     }
@@ -31,7 +31,7 @@ export default async function configRoutes(app: FastifyInstance) {
     }
 
     const config = await app.prisma.businessConfig.updateMany({
-      where: { tenantId: tenant.tenantId },
+      where: { tenantId: user.tenantId },
       data: {
         voiceProfile: body.voiceProfile,
         aiProvider: body.aiProvider,

@@ -4,11 +4,13 @@ import helmet from '@fastify/helmet';
 import formBody from '@fastify/formbody';
 import rateLimit from '@fastify/rate-limit';
 import fastifyRawBody from 'fastify-raw-body';
+import jwt from '@fastify/jwt';
 
 import { PrismaClient } from '@prisma/client';
 
 import { env } from './config/env';
 import { TenantMissingError } from './lib/tenant';
+import { UnauthorizedError } from './lib/auth';
 import authRoutes from './routes/auth';
 import onboardingRoutes from './routes/onboarding';
 import twilioRoutes from './routes/twilio';
@@ -33,6 +35,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(cors, { origin: true });
   await app.register(helmet);
   await app.register(formBody);
+  await app.register(jwt, {
+    secret: env.JWT_SECRET
+  });
   await app.register(rateLimit, {
     global: true,
     max: 200,
@@ -43,8 +48,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     field: 'rawBody',
     global: false,
     runFirst: true,
-    encoding: 'utf8',
-    bodyLimit: 1_000_000 // allow up to 1MB payloads (Stripe is small)
+    encoding: 'utf8'
   });
 
   if (options.prismaClient) {
@@ -69,6 +73,13 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     if (error instanceof TenantMissingError) {
       return reply.status(error.statusCode ?? 400).send({
         error: 'Bad Request',
+        message: error.message
+      });
+    }
+
+    if (error instanceof UnauthorizedError) {
+      return reply.status(error.statusCode ?? 401).send({
+        error: 'Unauthorized',
         message: error.message
       });
     }
