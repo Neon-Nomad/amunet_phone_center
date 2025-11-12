@@ -1,0 +1,191 @@
+=== CRITICAL FILES WITH SECURITY ISSUES ===
+
+FILE: /home/user/amunet_phone_center/server/src/config/env.ts
+CRITICAL ISSUE: Default JWT_SECRET
+Line 27: JWT_SECRET: z.string().min(32).default('change-me-in-production-min-32-chars-long-secret-key')
+---
+
+FILE: /home/user/amunet_phone_center/server/src/app.ts
+ISSUE 1 (Line 35): CORS too permissive
+  Code: await app.register(cors, { origin: true });
+  
+ISSUE 2 (Line 88): Error handler leaks stack traces
+  Code: reply.send(error);
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/routes/chatbot.ts
+ISSUE 1 (Line 168-173): No Zod validation on chatbot endpoint
+  - Message length unbounded
+  - No sanitization before logging to OpenAI
+
+ISSUE 2 (Line 251-252): CRITICAL CORS + Credentials
+  Code: 
+    .header('Access-Control-Allow-Origin', request.headers.origin ?? '*')
+    .header('Access-Control-Allow-Credentials', 'true')
+
+ISSUE 3 (Line 220-237): Promise.all() instead of Promise.allSettled()
+  - One failed background job cancels all others
+
+ISSUE 4 (Line 240-248): Plaintext message logging
+  - User messages stored unencrypted with PII
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/routes/auth.ts
+ISSUE 1 (Line 9, 15): Weak password requirements
+  Code: password: z.string().min(8)
+  - No complexity requirements
+  - Vulnerable to brute-force
+
+ISSUE 2 (Line 76): 7-day token expiration too long
+  Code: expiresIn: '7d'
+  - No refresh mechanism
+  - No token revocation
+
+ISSUE 3 (Line 86-91): Logout doesn't invalidate tokens
+  - Client-side token removal only
+  - No server-side blacklist
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/routes/billing.ts
+ISSUE 1 (Line 13, 39-40): No URL domain whitelist
+  Code: successUrl: z.string().url()
+  - Can redirect to any URL
+  - Open redirect vulnerability
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/routes/twilio.ts
+ISSUE 1 (Line 19): Schema .passthrough() allows unknown fields
+  Code: .passthrough();
+  - Bypasses validation
+  - Could inject arbitrary data
+
+ISSUE 2 (Line 37, 85): Unvalidated JSON metadata storage
+  Code: metadata: payload
+  - Stores entire webhook payload
+  - No sanitization before storage
+
+ISSUE 3 (No rate limiting): Webhooks vulnerable to replay attacks
+  - Only signature verification, no nonce tracking
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/app.ts
+ISSUE: Global rate limit too high
+Line 41-45: max: 200, timeWindow: '1 minute'
+  - No differentiation by endpoint
+  - No per-user/IP tracking
+  - Login endpoint unprotected
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/routes/twilio.ts
+ISSUE: Race condition in subscription update
+Line 96-102:
+  const minutes = Math.ceil(durationSeconds / 60);
+  await app.prisma.subscription.update({
+    where: { id: subscription.id },
+    data: { meteredMinutes: subscription.meteredMinutes + minutes }
+  });
+  
+  - Reads then writes (race condition)
+  - Two concurrent calls could cause lost updates
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/services/onboardingService.ts
+ISSUE 1 (Line 145-147): console.error() in production
+  Code:
+    console.error('!!!!!!!!!! OPENAI ONBOARDING FAILED !!!!!!!!!!!');
+    console.error(error.response?.data ?? error.message ?? error);
+    
+ISSUE 2 (Line 200-203): Dynamic greeting with interpolation
+  Code: greeting: `Thanks for calling ${businessName}.`
+  - Unvalidated input in JSON field
+  - Could cause JSON injection
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/services/mailService.ts
+ISSUE: Hardcoded email address
+Line 19: from: { email: 'hello@amunet.ai', name: 'Amunet AI Concierge' }
+  - Should be externalized to environment variable
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/services/voiceService.ts
+ISSUE: Silent error swallowing
+Line 56-58:
+  } catch (error) {
+    // swallow errors and fall back to deterministic voice mapping
+  }
+  - No logging of failures
+  - Makes debugging difficult
+
+---
+
+FILE: /home/user/amunet_phone_center/server/src/lib/tenant.ts
+ISSUE: Tenant ID from header/query, not JWT
+Line 20-22:
+  const tenantIdHeader = request.headers[tenantHeader];
+  const tenantIdQuery = query?.tenantId;
+  const tenantId = tenantIdHeader ?? tenantIdQuery;
+  
+  - Could allow tenant confusion attacks
+  - Should extract from authenticated JWT instead
+
+---
+
+=== SUMMARY OF FINDINGS ===
+
+CRITICAL (3):
+1. Default JWT_SECRET in env.ts:27
+2. Wildcard CORS + Credentials in chatbot.ts:251-252
+3. Stack trace exposure in app.ts:88
+
+HIGH (7):
+1. Weak password requirements (auth.ts:9,15)
+2. 7-day JWT expiration (auth.ts:76)
+3. Schema .passthrough() (twilio.ts:19)
+4. No URL domain whitelist (billing.ts:39-40)
+5. Chatbot no validation (chatbot.ts:168-173)
+6. Weak global rate limit (app.ts:41-45)
+7. Error handler leaks info (app.ts:88)
+
+MEDIUM (10+):
+1. No login rate limiting
+2. Unvalidated JSON metadata
+3. console.error in production
+4. Promise.all vs allSettled
+5. Plaintext message logging
+6. No logout invalidation
+7. Tenant ID from query params
+8. Race condition in subscription update
+9. Silent error swallowing
+10. Hardcoded email address
+
+=== IMMEDIATE ACTIONS REQUIRED ===
+
+1. REMOVE JWT_SECRET DEFAULT:
+   File: server/src/config/env.ts:27
+   Change: Remove .default() and fail in production if not set
+
+2. FIX CORS MISCONFIGURATION:
+   File: server/src/app.ts:35 and routes/chatbot.ts:251-252
+   Change: Whitelist specific domains, never use wildcard with credentials
+
+3. FIX ERROR HANDLER:
+   File: server/src/app.ts:72-89
+   Change: Never expose error object to client in production
+
+4. ADD VALIDATION TO CHATBOT:
+   File: server/src/routes/chatbot.ts:167
+   Change: Add Zod schema validation before processing
+
+5. REMOVE .passthrough():
+   File: server/src/routes/twilio.ts:19
+   Change: Remove or explicitly list allowed fields
+
