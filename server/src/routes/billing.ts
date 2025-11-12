@@ -8,10 +8,33 @@ import { getStripeClient } from '../lib/stripe';
 import { metrics } from '../lib/metrics';
 import { BillingService } from '../services/billingService';
 
+// Allowed domains for redirect URLs to prevent open redirect vulnerabilities
+const ALLOWED_REDIRECT_DOMAINS = [
+  'localhost',
+  'amunet.ai',
+  'www.amunet.ai'
+];
+
+const isAllowedRedirectUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+    return ALLOWED_REDIRECT_DOMAINS.some(domain =>
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+  } catch {
+    return false;
+  }
+};
+
 const checkoutSchema = z.object({
   tier: z.enum(['STARTER', 'PROFESSIONAL', 'ENTERPRISE']),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
+  successUrl: z.string().url().refine(isAllowedRedirectUrl, {
+    message: 'Success URL must be from an allowed domain'
+  }),
+  cancelUrl: z.string().url().refine(isAllowedRedirectUrl, {
+    message: 'Cancel URL must be from an allowed domain'
+  }),
   customerEmail: z.string().email()
 });
 
@@ -46,7 +69,12 @@ export default async function billingRoutes(app: FastifyInstance) {
 
   app.post('/portal', { preHandler: requireAuth }, async (request, reply) => {
     const user = getAuthUser(request);
-    const schema = z.object({ customerId: z.string(), returnUrl: z.string().url() });
+    const schema = z.object({
+      customerId: z.string(),
+      returnUrl: z.string().url().refine(isAllowedRedirectUrl, {
+        message: 'Return URL must be from an allowed domain'
+      })
+    });
     const body = schema.parse(request.body);
     const subscription = await app.prisma.subscription.findFirst({
       where: { tenantId: user.tenantId }

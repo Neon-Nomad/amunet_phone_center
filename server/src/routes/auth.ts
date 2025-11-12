@@ -4,19 +4,38 @@ import { z } from 'zod';
 
 import { requireAuth } from '../lib/auth';
 
+// Password must be at least 12 characters with uppercase, lowercase, number, and special character
+const passwordSchema = z
+  .string()
+  .min(12, 'Password must be at least 12 characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
+
 const registrationSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   tenantName: z.string().min(2)
 });
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8)
+  password: z.string().min(1) // Don't validate complexity on login, just check if provided
 });
 
 export default async function authRoutes(app: FastifyInstance) {
-  app.post('/register', async (request, reply) => {
+  // Add stricter rate limiting for auth endpoints
+  const authRateLimit = {
+    config: {
+      rateLimit: {
+        max: 5, // Only 5 attempts
+        timeWindow: '15 minutes'
+      }
+    }
+  };
+
+  app.post('/register', authRateLimit, async (request, reply) => {
     const body = registrationSchema.parse(request.body);
 
     const existing = await app.prisma.user.findUnique({ where: { email: body.email } });
@@ -53,7 +72,7 @@ export default async function authRoutes(app: FastifyInstance) {
     });
   });
 
-  app.post('/login', async (request, reply) => {
+  app.post('/login', authRateLimit, async (request, reply) => {
     const body = loginSchema.parse(request.body);
     const user = await app.prisma.user.findUnique({ where: { email: body.email } });
     if (!user) {
@@ -73,7 +92,7 @@ export default async function authRoutes(app: FastifyInstance) {
         email: user.email
       },
       {
-        expiresIn: '7d' // Token expires in 7 days
+        expiresIn: '2h' // Token expires in 2 hours (reduced from 7 days for security)
       }
     );
 

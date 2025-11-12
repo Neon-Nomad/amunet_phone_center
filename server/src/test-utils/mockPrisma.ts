@@ -101,7 +101,16 @@ export function createMockPrisma() {
       let count = 0;
       for (const record of store[model]) {
         if (matchesWhere(record, where)) {
-          Object.assign(record, data, { updatedAt: now() });
+          // Handle atomic increment operations
+          const updates: Record<string, any> = {};
+          for (const [key, value] of Object.entries(data)) {
+            if (value && typeof value === 'object' && 'increment' in value) {
+              updates[key] = (record[key] ?? 0) + value.increment;
+            } else {
+              updates[key] = value;
+            }
+          }
+          Object.assign(record, updates, { updatedAt: now() });
           count++;
         }
       }

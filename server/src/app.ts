@@ -32,16 +32,58 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     logger: options.logger ?? (env.NODE_ENV !== 'test')
   });
 
-  await app.register(cors, { origin: true });
-  await app.register(helmet);
+  // Configure CORS with allowed origins
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://amunet.ai',
+    'https://www.amunet.ai'
+  ];
+
+  await app.register(cors, {
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'), false);
+      }
+    },
+    credentials: true
+  });
+
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"]
+      }
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    }
+  });
+
   await app.register(formBody);
   await app.register(jwt, {
     secret: env.JWT_SECRET
   });
+
+  // Improved rate limiting with different limits for different routes
   await app.register(rateLimit, {
     global: true,
-    max: 200,
-    timeWindow: '1 minute'
+    max: 100, // Reduced from 200
+    timeWindow: '1 minute',
+    skipOnError: false
   });
 
   await app.register(fastifyRawBody, {
@@ -70,6 +112,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(chatbotRoutes, { prefix: '/api' });
 
   app.setErrorHandler((error, request, reply) => {
+    // Log the full error for debugging
+    request.log.error(error);
+
     if (error instanceof TenantMissingError) {
       return reply.status(error.statusCode ?? 400).send({
         error: 'Bad Request',
@@ -84,8 +129,20 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       });
     }
 
-    // Default Fastify handler
-    reply.send(error);
+    // Handle validation errors
+    if (error.validation) {
+      return reply.status(400).send({
+        error: 'Bad Request',
+        message: 'Invalid request data'
+      });
+    }
+
+    // Generic error response - don't expose stack traces
+    const statusCode = error.statusCode ?? 500;
+    return reply.status(statusCode).send({
+      error: statusCode >= 500 ? 'Internal Server Error' : 'Bad Request',
+      message: statusCode >= 500 ? 'An error occurred processing your request' : error.message
+    });
   });
 
   return app;

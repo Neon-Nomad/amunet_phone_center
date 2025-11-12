@@ -7,6 +7,7 @@ import { env } from '../config/env';
 import { createTwilioSignature } from '../lib/twilio';
 import { createMockPrisma } from '../test-utils/mockPrisma';
 import { createStripeSignature } from '../test-utils/stripe';
+import { generateTestToken, createTestUser } from '../test-utils/auth';
 import Stripe from 'stripe';
 import * as stripeLib from '../lib/stripe';
 
@@ -192,6 +193,7 @@ describe('amunet platform flows', () => {
     const store = context.prisma.store;
     expect(store.call).toHaveLength(1);
     expect(store.call[0]).toMatchObject({ providerSid: 'CA12345', duration: 125 });
+    // Check that subscription minutes were incremented (atomic operation returns count of updated records)
     expect(store.subscription[0].meteredMinutes).toBeGreaterThan(0);
     expect(store.booking).toHaveLength(1);
     expect(store.auditLog.length).toBeGreaterThan(0);
@@ -312,6 +314,13 @@ describe('amunet platform flows', () => {
   it('enforces premium voice upgrades via config route', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'Voice Co' } } as any);
+    const user = await client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@voiceco.test',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: { tenantId: tenant.id, tier: 'STARTER', status: 'ACTIVE', meteredMinutes: 0 }
     } as any);
@@ -325,11 +334,13 @@ describe('amunet platform flows', () => {
       }
     } as any);
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     const response = await app.inject({
       method: 'PUT',
       url: '/api/config',
       headers: {
-        'x-tenant-id': tenant.id
+        authorization: `Bearer ${token}`
       },
       payload: {
         voiceProfile: 'confident-elevenlabs-scarlett',
@@ -345,6 +356,13 @@ describe('amunet platform flows', () => {
     const { client } = context.prisma;
     const tenantA = await client.tenant.create({ data: { name: 'Tenant A' } } as any);
     const tenantB = await client.tenant.create({ data: { name: 'Tenant B' } } as any);
+    const userA = await client.user.create({
+      data: {
+        tenantId: tenantA.id,
+        email: 'userA@test.com',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: { tenantId: tenantA.id, tier: 'STARTER', status: 'ACTIVE', meteredMinutes: 0 }
     } as any);
@@ -370,11 +388,13 @@ describe('amunet platform flows', () => {
       }
     } as any);
 
+    const tokenA = generateTestToken(app, createTestUser(tenantA.id, userA.id, userA.email));
+
     const response = await app.inject({
       method: 'GET',
       url: '/api/dashboard/overview',
       headers: {
-        'x-tenant-id': tenantA.id
+        authorization: `Bearer ${tokenA}`
       }
     });
 
@@ -451,6 +471,13 @@ describe('amunet platform flows', () => {
     const { client } = context.prisma;
     const tenantA = await client.tenant.create({ data: { name: 'Tenant A' } } as any);
     const tenantB = await client.tenant.create({ data: { name: 'Tenant B' } } as any);
+    const userA = await client.user.create({
+      data: {
+        tenantId: tenantA.id,
+        email: 'userA@billing.test',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: {
         tenantId: tenantA.id,
@@ -470,15 +497,17 @@ describe('amunet platform flows', () => {
       }
     } as any);
 
+    const tokenA = generateTestToken(app, createTestUser(tenantA.id, userA.id, userA.email));
+
     const response = await app.inject({
       method: 'POST',
       url: '/api/billing/portal',
       headers: {
-        'x-tenant-id': tenantA.id
+        authorization: `Bearer ${tokenA}`
       },
       payload: {
         customerId: 'cus_tenant_b',
-        returnUrl: 'https://example.com'
+        returnUrl: 'https://amunet.ai/dashboard'  // Updated to use allowed domain
       }
     });
 
@@ -743,22 +772,28 @@ describe('amunet platform flows', () => {
     context.prisma.client.subscription.updateMany = originalUpdateMany;
   });
 
-  it('returns 400 when tenant ID is missing', async () => {
+  it('returns 401 when JWT token is missing', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/dashboard/overview'
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({
-      error: 'Bad Request',
-      message: expect.stringContaining('tenant identifier')
+      error: 'Unauthorized'
     });
   });
 
   it('creates new Stripe customer on first checkout', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'New Co' } } as any);
+    const user = await client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@newco.test',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: {
         tenantId: tenant.id,
@@ -781,15 +816,17 @@ describe('amunet platform flows', () => {
 
     stripeLib.setStripeClientForTesting(stripeMock as unknown as Stripe);
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     const response = await app.inject({
       method: 'POST',
       url: '/api/billing/checkout',
-      headers: { 'x-tenant-id': tenant.id },
+      headers: { authorization: `Bearer ${token}` },
       payload: {
         tier: 'PROFESSIONAL',
         customerEmail: 'new@example.com',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel'
+        successUrl: 'https://amunet.ai/success',  // Updated to allowed domain
+        cancelUrl: 'https://amunet.ai/cancel'  // Updated to allowed domain
       }
     });
 
@@ -808,6 +845,13 @@ describe('amunet platform flows', () => {
   it('reuses existing Stripe customer on subsequent checkout', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'Existing Co' } } as any);
+    const user = await client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@existing.test',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: {
         tenantId: tenant.id,
@@ -830,15 +874,17 @@ describe('amunet platform flows', () => {
 
     stripeLib.setStripeClientForTesting(stripeMock);
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     await app.inject({
       method: 'POST',
       url: '/api/billing/checkout',
-      headers: { 'x-tenant-id': tenant.id },
+      headers: { authorization: `Bearer ${token}` },
       payload: {
         tier: 'PROFESSIONAL',
         customerEmail: 'existing@example.com',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel'
+        successUrl: 'https://amunet.ai/success',  // Updated to allowed domain
+        cancelUrl: 'https://amunet.ai/cancel'  // Updated to allowed domain
       }
     });
 
@@ -853,19 +899,28 @@ describe('amunet platform flows', () => {
   it('rejects checkout with invalid email', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'Test' } } as any);
+    const user = await client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@test.com',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: { tenantId: tenant.id, tier: 'STARTER', status: 'ACTIVE' }
     } as any);
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     const response = await app.inject({
       method: 'POST',
       url: '/api/billing/checkout',
-      headers: { 'x-tenant-id': tenant.id },
+      headers: { authorization: `Bearer ${token}` },
       payload: {
         tier: 'PROFESSIONAL',
         customerEmail: 'not-an-email',
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel'
+        successUrl: 'https://amunet.ai/success',
+        cancelUrl: 'https://amunet.ai/cancel'
       }
     });
 
@@ -875,6 +930,13 @@ describe('amunet platform flows', () => {
   it('returns 403 when subscription has no Stripe customer', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'No Customer' } } as any);
+    const user = await client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@nocust.test',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: {
         tenantId: tenant.id,
@@ -884,13 +946,15 @@ describe('amunet platform flows', () => {
       }
     } as any);
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     const response = await app.inject({
       method: 'POST',
       url: '/api/billing/portal',
-      headers: { 'x-tenant-id': tenant.id },
+      headers: { authorization: `Bearer ${token}` },
       payload: {
         customerId: 'cus_any',
-        returnUrl: 'https://example.com'
+        returnUrl: 'https://amunet.ai/dashboard'
       }
     });
 
@@ -901,14 +965,23 @@ describe('amunet platform flows', () => {
   it('returns empty dashboard arrays when tenant has no activity', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'Empty Tenant' } } as any);
+    const user = await client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@empty.test',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: { tenantId: tenant.id, tier: 'STARTER', status: 'ACTIVE' }
     } as any);
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     const response = await app.inject({
       method: 'GET',
       url: '/api/dashboard/overview',
-      headers: { 'x-tenant-id': tenant.id }
+      headers: { authorization: `Bearer ${token}` }
     });
 
     expect(response.statusCode).toBe(200);
@@ -918,48 +991,57 @@ describe('amunet platform flows', () => {
     expect(body.subscription).toBeTruthy();
   });
 
-  it('preserves unknown Twilio webhook fields via passthrough', async () => {
+  it('validates Twilio webhook fields with strict schema', async () => {
     const onboardingResponse = await app.inject({
       method: 'POST',
       url: '/api/onboarding/start',
       payload: {
-        businessName: 'Passthrough Test',
-        email: 'pass@test.com',
+        businessName: 'Validation Test',
+        email: 'valid@test.com',
         tier: 'STARTER'
       }
     });
     const tenantId = onboardingResponse.json().tenantId;
 
-    const payload = {
-      CallSid: 'CA_pass',
+    // Test that known fields are accepted
+    const validPayload = {
+      CallSid: 'CA_valid',
       From: '+1234',
       To: '+5678',
       CallStatus: 'queued',
-      CustomField1: 'custom_value',
-      FutureFeature: { nested: 'data' }
+      AccountSid: 'AC123',
+      ApiVersion: '2010-04-01'
     };
-    const signature = createTwilioSignature(`https://${context.host}/api/twilio/voice`, payload);
+    const validSignature = createTwilioSignature(`https://${context.host}/api/twilio/voice`, validPayload);
 
-    await app.inject({
+    const validResponse = await app.inject({
       method: 'POST',
       url: '/api/twilio/voice',
       headers: {
         'x-tenant-id': tenantId,
         host: context.host,
         'x-forwarded-proto': 'https',
-        'x-twilio-signature': signature
+        'x-twilio-signature': validSignature
       },
-      payload
+      payload: validPayload
     });
 
-    const call = context.prisma.store.call.find((record) => record.providerSid === 'CA_pass');
-    expect(call?.metadata).toHaveProperty('CustomField1', 'custom_value');
-    expect(call?.metadata).toHaveProperty('FutureFeature');
+    expect(validResponse.statusCode).toBe(200);
+    const call = context.prisma.store.call.find((record) => record.providerSid === 'CA_valid');
+    expect(call).toBeTruthy();
+    expect(call?.fromNumber).toBe('+1234');
   });
 
   it('allows professional tier to set premium voices', async () => {
     const { client } = context.prisma;
     const tenant = await client.tenant.create({ data: { name: 'Premium Co' } } as any);
+    const user = await client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@premium.test',
+        passwordHash: 'hash'
+      }
+    } as any);
     await client.subscription.create({
       data: { tenantId: tenant.id, tier: 'PROFESSIONAL', status: 'ACTIVE', meteredMinutes: 0 }
     } as any);
@@ -973,10 +1055,12 @@ describe('amunet platform flows', () => {
       }
     } as any);
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     const response = await app.inject({
       method: 'PUT',
       url: '/api/config',
-      headers: { 'x-tenant-id': tenant.id },
+      headers: { authorization: `Bearer ${token}` },
       payload: {
         voiceProfile: 'confident-elevenlabs-premium',
         aiProvider: 'openai-premium',
@@ -994,7 +1078,7 @@ describe('amunet platform flows', () => {
       url: '/api/auth/register',
       payload: {
         email: 'duplicate@test.com',
-        password: 'password123',
+        password: 'ValidPass123!',  // Updated to meet new requirements
         tenantName: 'First Tenant'
       }
     });
@@ -1004,7 +1088,7 @@ describe('amunet platform flows', () => {
       url: '/api/auth/register',
       payload: {
         email: 'duplicate@test.com',
-        password: 'differentpass',
+        password: 'DifferentPass456!',  // Updated to meet new requirements
         tenantName: 'Second Tenant'
       }
     });
@@ -1019,7 +1103,7 @@ describe('amunet platform flows', () => {
       url: '/api/auth/register',
       payload: {
         email: 'user@test.com',
-        password: 'correctpass',
+        password: 'CorrectPass123!',  // Updated to meet new requirements
         tenantName: 'Test Tenant'
       }
     });

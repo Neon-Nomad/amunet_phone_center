@@ -19,6 +19,34 @@ const initialMessages: Message[] = [
   }
 ];
 
+// Allowed domains for action URLs to prevent XSS and phishing attacks
+const ALLOWED_ACTION_DOMAINS = [
+  'cal.com',
+  'calendly.com',
+  'amunet.ai',
+  'www.amunet.ai',
+  'api.cal.com'
+];
+
+const isAllowedActionUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+
+    // Reject javascript: data: and other dangerous protocols
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+
+    // Check if domain is in allowed list
+    return ALLOWED_ACTION_DOMAINS.some(domain =>
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+  } catch {
+    return false;
+  }
+};
+
 const buildStatusFromActions = (actions: ChatAction[]) => {
   if (!actions.length) {
     return 'I am listening.';
@@ -68,7 +96,17 @@ export default function ChatWidget() {
     setDisabledActionKeys((prev) => [...prev, key]);
 
     if (action.type === 'book_demo' && action.payload?.url && typeof window !== 'undefined') {
-      window.open(action.payload.url, '_blank');
+      // Validate URL before opening to prevent XSS and phishing
+      if (!isAllowedActionUrl(action.payload.url)) {
+        setStatus('Invalid booking URL. Please contact support.');
+        console.error('Blocked untrusted URL:', action.payload.url);
+        return;
+      }
+
+      const newWindow = window.open(action.payload.url, '_blank', 'noopener,noreferrer');
+      if (newWindow) {
+        newWindow.opener = null; // Additional security measure
+      }
       setStatus('Opening the demo booking page...');
       return;
     }
@@ -131,7 +169,7 @@ export default function ChatWidget() {
           <div className="chat-widget__header">
             <div className="chat-widget__title">Amunet AI Concierge</div>
             <button className="chat-widget__close" onClick={() => setIsOpen(false)} aria-label="Close chat">
-              ×
+              ï¿½
             </button>
           </div>
           <div className="chat-widget__messages">

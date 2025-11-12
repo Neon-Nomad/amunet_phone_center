@@ -4,6 +4,7 @@ import { FastifyInstance } from 'fastify';
 
 import { buildApp } from '../app';
 import { createMockPrisma } from '../test-utils/mockPrisma';
+import { generateTestToken, createTestUser } from '../test-utils/auth';
 
 describe('/api/status', () => {
   let app: FastifyInstance;
@@ -25,6 +26,14 @@ describe('/api/status', () => {
       } as any
     });
 
+    const user = await mockContext.client.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'user@realtime.test',
+        passwordHash: 'hash'
+      } as any
+    });
+
     await mockContext.client.call.create({
       data: {
         tenantId: tenant.id,
@@ -35,10 +44,12 @@ describe('/api/status', () => {
       } as any
     });
 
+    const token = generateTestToken(app, createTestUser(tenant.id, user.id, user.email));
+
     const response = await app.inject({
       method: 'GET',
       url: '/api/status',
-      headers: { 'x-tenant-id': tenant.id }
+      headers: { authorization: `Bearer ${token}` }
     });
 
     expect(response.statusCode).toBe(200);
