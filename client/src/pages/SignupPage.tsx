@@ -105,6 +105,16 @@ export default function SignupPage() {
               minLength={8}
               required
             />
+            <div className="mt-2 space-y-1 text-xs text-white/50">
+              <p className="font-medium">Password requirements:</p>
+              <ul className="ml-4 list-disc space-y-0.5">
+                <li>At least 8 characters</li>
+                <li>One uppercase letter (A-Z)</li>
+                <li>One lowercase letter (a-z)</li>
+                <li>One number (0-9)</li>
+                <li>One special character (!@#$%^&*...)</li>
+              </ul>
+            </div>
           </div>
           <button
             type="submit"
