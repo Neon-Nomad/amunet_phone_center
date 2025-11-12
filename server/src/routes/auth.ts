@@ -4,10 +4,10 @@ import { z } from 'zod';
 
 import { requireAuth } from '../lib/auth';
 
-// Password must be at least 12 characters with uppercase, lowercase, number, and special character
+// Password must be at least 8 characters with uppercase, lowercase, number, and special character
 const passwordSchema = z
   .string()
-  .min(12, 'Password must be at least 12 characters')
+  .min(8, 'Password must be at least 8 characters')
   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
   .regex(/[0-9]/, 'Password must contain at least one number')
@@ -36,7 +36,20 @@ export default async function authRoutes(app: FastifyInstance) {
   };
 
   app.post('/register', authRateLimit, async (request, reply) => {
-    const body = registrationSchema.parse(request.body);
+    // Validate request body and return user-friendly errors
+    const parseResult = registrationSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      const errors = parseResult.error.errors.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message
+      }));
+      return reply.status(400).send({
+        error: 'Validation failed',
+        details: errors
+      });
+    }
+
+    const body = parseResult.data;
 
     const existing = await app.prisma.user.findUnique({ where: { email: body.email } });
     if (existing) {
@@ -73,7 +86,20 @@ export default async function authRoutes(app: FastifyInstance) {
   });
 
   app.post('/login', authRateLimit, async (request, reply) => {
-    const body = loginSchema.parse(request.body);
+    // Validate request body and return user-friendly errors
+    const parseResult = loginSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      const errors = parseResult.error.errors.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message
+      }));
+      return reply.status(400).send({
+        error: 'Validation failed',
+        details: errors
+      });
+    }
+
+    const body = parseResult.data;
     const user = await app.prisma.user.findUnique({ where: { email: body.email } });
     if (!user) {
       return reply.status(401).send({ error: 'Invalid credentials' });

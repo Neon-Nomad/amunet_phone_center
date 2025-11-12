@@ -49,12 +49,20 @@ export default function SignupPage() {
       navigate('/dashboard');
     } catch (error) {
       setStatus('error');
-      const axiosError = error as AxiosError<ApiError>;
-      const errorMessage = axiosError.response?.data?.error 
-        ?? axiosError.response?.data?.message 
-        ?? axiosError.message 
-        ?? 'Unable to create an account.';
-      setMessage(errorMessage);
+      const axiosError = error as AxiosError<ApiError & { details?: Array<{ field: string; message: string }> }>;
+
+      // Check if we have detailed validation errors
+      const details = axiosError.response?.data?.details;
+      if (details && details.length > 0) {
+        const validationErrors = details.map(d => d.message).join('. ');
+        setMessage(validationErrors);
+      } else {
+        const errorMessage = axiosError.response?.data?.error
+          ?? axiosError.response?.data?.message
+          ?? axiosError.message
+          ?? 'Unable to create an account.';
+        setMessage(errorMessage);
+      }
     }
   };
 
@@ -105,6 +113,9 @@ export default function SignupPage() {
               minLength={8}
               required
             />
+            <p className="mt-1 text-xs text-white/50">
+              Must be at least 8 characters with uppercase, lowercase, number, and special character
+            </p>
           </div>
           <button
             type="submit"
