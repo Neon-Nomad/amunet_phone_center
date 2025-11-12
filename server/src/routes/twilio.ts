@@ -4,19 +4,24 @@ import { z } from 'zod';
 import { assertTenant } from '../lib/tenant';
 import { verifyTwilioSignature } from '../lib/twilio';
 
-const twilioPayloadSchema = z
-  .object({
-    CallSid: z.string().optional(),
-    From: z.string().optional(),
-    To: z.string().optional(),
+const twilioPayloadSchema = z.object({
+  CallSid: z.string().optional(),
+  From: z.string().optional(),
+  To: z.string().optional(),
   CallStatus: z.string().optional(),
   RecordingUrl: z.string().optional(),
   CallDuration: z.union([z.string(), z.number()]).optional(),
   Body: z.string().optional(),
   Channel: z.string().optional(),
-  MessageSid: z.string().optional()
-  })
-  .passthrough();
+  MessageSid: z.string().optional(),
+  // Allow common Twilio fields
+  AccountSid: z.string().optional(),
+  ApiVersion: z.string().optional(),
+  Direction: z.string().optional(),
+  ForwardedFrom: z.string().optional(),
+  CallerName: z.string().optional()
+  // Removed .passthrough() for strict validation
+});
 
 export default async function twilioRoutes(app: FastifyInstance) {
   app.post('/voice', async (request, reply) => {
@@ -88,18 +93,15 @@ export default async function twilioRoutes(app: FastifyInstance) {
       }
     }
 
-    if (payload.CallStatus && ['completed', 'in-progress'].includes(payload.CallStatus.toLowerCase())) {
-      const subscription = await app.prisma.subscription.findFirst({
-        where: { tenantId: tenant.tenantId }
-      });
+    // Update subscription minutes atomically to prevent race conditions
+    if (payload.CallStatus && ['completed', 'in-progress'].includes(payload.CallStatus.toLowerCase()) && durationSeconds > 0) {
+      const minutes = Math.max(1, Math.ceil(durationSeconds / 60));
 
-      if (subscription && durationSeconds > 0) {
-        const minutes = Math.max(1, Math.ceil(durationSeconds / 60));
-        await app.prisma.subscription.update({
-          where: { id: subscription.id },
-          data: { meteredMinutes: subscription.meteredMinutes + minutes }
-        });
-      }
+      // Use atomic increment to avoid read-then-write race condition
+      await app.prisma.subscription.updateMany({
+        where: { tenantId: tenant.tenantId },
+        data: { meteredMinutes: { increment: minutes } }
+      });
     }
 
     if (payload.CallStatus && ['no-answer', 'busy', 'failed'].includes(payload.CallStatus.toLowerCase())) {

@@ -11,7 +11,7 @@ export default async function statusRoutes(app: FastifyInstance) {
       where: { tenantId: user.tenantId }
     });
 
-    const activeCalls = calls.filter((call) => call.createdAt >= windowStart).length;
+    const activeCalls = calls.filter((call: { createdAt: Date }) => call.createdAt >= windowStart).length;
 
     return reply.send({
       uptime: '99.9%',

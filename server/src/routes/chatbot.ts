@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import axios from 'axios';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { z } from 'zod';
 
 import { env } from '../config/env';
 import { sendSalesEmail } from '../services/mailService';
@@ -13,6 +14,15 @@ interface PricingTier {
   features: string[];
 }
 
+// Validation schema for chat requests
+const chatRequestSchema = z.object({
+  message: z.string().min(1).max(2000),
+  userType: z.enum(['visitor', 'trial', 'customer']).optional(),
+  tenantId: z.string().optional(),
+  intent: z.string().max(100).optional(),
+  userId: z.string().max(100).optional()
+});
+
 export interface ChatRequestBody {
   message: string;
   userType?: 'visitor' | 'trial' | 'customer';
@@ -20,6 +30,14 @@ export interface ChatRequestBody {
   intent?: string;
   userId?: string;
 }
+
+// Allowed CORS origins for chatbot
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://amunet.ai',
+  'https://www.amunet.ai'
+];
 
 interface ChatAction {
   type: 'book_demo' | 'send_email' | 'notify_live_agent';
@@ -150,6 +168,7 @@ const notifyLiveAgent = async (meta: Record<string, unknown>, message: string) =
 };
 
 const sendEmailFollowUp = async (meta: Record<string, unknown>, body: ChatRequestBody) => {
+  const actions = Array.isArray(meta.actions) ? meta.actions.join(', ') : 'none';
   await sendSalesEmail({
     subject: meta.intent ? `New chatbot follow-up: ${meta.intent}` : 'New chatbot lead',
     body: [
@@ -158,14 +177,20 @@ const sendEmailFollowUp = async (meta: Record<string, unknown>, body: ChatReques
       `Tenant: ${body.tenantId ?? 'n/a'}`,
       `User: ${body.userId ?? 'anonymous'}`,
       `Timestamp: ${meta.timestamp ?? new Date().toISOString()}`,
-      `Actions: ${meta.actions?.join(', ') ?? 'none'}`
+      `Actions: ${actions}`
     ].join('\n')
   });
 };
 
 const chatbotRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: ChatRequestBody; Reply: ChatResponse }>('/chat', async (request, reply) => {
-    const { message, userType = 'visitor', tenantId, intent, userId } = request.body;
+    // Validate request body
+    const validationResult = chatRequestSchema.safeParse(request.body);
+    if (!validationResult.success) {
+      return reply.status(400).send({ text: 'Invalid request. Please check your input.' });
+    }
+
+    const { message, userType = 'visitor', tenantId, intent, userId } = validationResult.data;
     const timestamp = new Date().toISOString();
 
     if (!message?.trim()) {
@@ -247,10 +272,15 @@ const chatbotRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    reply
-      .header('Access-Control-Allow-Origin', request.headers.origin ?? '*')
-      .header('Access-Control-Allow-Credentials', 'true')
-      .send({ text: botText, pricing: tiers, actions });
+    // Set CORS headers with strict origin checking
+    const origin = request.headers.origin;
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+      reply
+        .header('Access-Control-Allow-Origin', origin)
+        .header('Access-Control-Allow-Credentials', 'true');
+    }
+
+    return reply.send({ text: botText, pricing: tiers, actions });
   });
 };
 

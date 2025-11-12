@@ -24,10 +24,25 @@ const envSchema = z.object({
   SLACK_WEBHOOK_URL: z.string().min(1),
   TWILIO_SUPPORT_NUMBER: z.string().min(1),
   SALES_EMAIL: z.string().email(),
-  JWT_SECRET: z.string().min(32).default('change-me-in-production-min-32-chars-long-secret-key')
+  JWT_SECRET: z.string().min(32)
 });
 
-const parsed = envSchema.safeParse(process.env);
+// Provide safe defaults for test environment only
+const testDefaults = process.env.NODE_ENV === 'test' ? {
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test',
+  JWT_SECRET: process.env.JWT_SECRET || 'test-secret-key-minimum-32-chars-long-for-testing-only',
+  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || 'SG.test_key',
+  SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/test',
+  TWILIO_SUPPORT_NUMBER: process.env.TWILIO_SUPPORT_NUMBER || '+15555555555',
+  SALES_EMAIL: process.env.SALES_EMAIL || 'sales@test.example.com'
+} : {};
+
+const envWithDefaults = {
+  ...process.env,
+  ...testDefaults
+};
+
+const parsed = envSchema.safeParse(envWithDefaults);
 
 if (!parsed.success) {
   // eslint-disable-next-line no-console
