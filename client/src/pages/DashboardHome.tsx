@@ -77,8 +77,6 @@ export default function DashboardHome() {
 
   const uptimeValue = statusInfo?.uptime ?? data?.uptime ?? '—';
   const lastUpdated = statusInfo ? new Date(statusInfo.lastUpdate).toLocaleTimeString() : null;
-  const planTier = data?.subscription?.tier ?? 'Starter';
-  const planStatus = data?.subscription?.status ?? 'Active';
   const callCount = data?.calls?.length ?? 0;
   const bookingCount = data?.bookings?.length ?? 0;
   const maxTrend = useMemo(() => Math.max(...uptimeTrend), []);

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 

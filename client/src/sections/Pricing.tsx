@@ -65,8 +65,8 @@ export default function Pricing() {
               <p className="text-xs uppercase tracking-[0.4em] text-[#6c4bff]">Guarantee</p>
               <h3 className="font-display text-3xl font-bold text-slate-900">One-Time 21-Day Lead Guarantee</h3>
               <p className="mt-2 text-sm text-slate-500">
-                You get 14 days free, then 7 paid days backed by our "Book-1-or-Refund" promise. If Amunet doesn't help
-                you book at least one new client in 21 days, you don't pay. After that, normal monthly billing applies—
+                You get 14 days free, then 7 paid days backed by our &ldquo;Book-1-or-Refund&rdquo; promise. If Amunet doesn&apos;t help
+                you book at least one new client in 21 days, you don&apos;t pay. After that, normal monthly billing applies—
                 because by then, Amunet should already be earning her keep.
               </p>
             </div>

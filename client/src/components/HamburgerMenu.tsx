@@ -2,10 +2,9 @@ import React from "react";
 
 interface HamburgerMenuProps {
   isOpen: boolean;
-  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const HamburgerMenu: React.FC<HamburgerMenuProps> = ({ isOpen, setIsOpen }) => {
+const HamburgerMenu: React.FC<HamburgerMenuProps> = ({ isOpen }) => {
   return (
     <div
       className={`fixed top-0 right-0 h-full bg-white shadow-lg z-40 transition-transform transform ${isOpen ? "translate-x-0" : "translate-x-full"} w-64`}

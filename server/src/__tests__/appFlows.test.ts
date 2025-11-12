@@ -1,21 +1,20 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-
 import { FastifyInstance } from 'fastify';
+import Stripe from 'stripe';
 
 import { buildApp } from '../app';
 import { env } from '../config/env';
 import { createTwilioSignature } from '../lib/twilio';
+import * as stripeLib from '../lib/stripe';
 import { createMockPrisma } from '../test-utils/mockPrisma';
 import { createStripeSignature } from '../test-utils/stripe';
 import { generateTestToken, createTestUser } from '../test-utils/auth';
-import Stripe from 'stripe';
-import * as stripeLib from '../lib/stripe';
 
 const axiosPost = vi.fn();
 
 vi.mock('axios', () => ({
   default: {
-    post: (...args: any[]) => axiosPost(...args)
+    post: (...args: unknown[]) => axiosPost(...args)
   }
 }));
 
